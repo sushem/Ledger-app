@@ -6,7 +6,7 @@
 <title>Ledger</title>
 <style>
   :root{
-    --ink:#16241C; --panel:#1E3226; --panel2:#24392B; --paper:#EDE7D8;
+    --ink:#000000; --panel:#000000; --panel2:#000000; --paper:#EDE7D8;
     --faint:#93A091; --rule:rgba(237,231,216,0.10); --gold:#C9A227; --moss:#7FB69A; --rust:#C1614A;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
@@ -59,7 +59,7 @@
   .fab{position:fixed; right:22px; bottom:22px; width:56px; height:56px; border-radius:50%;
     background:var(--gold); border:none; font-size:28px; color:var(--ink); box-shadow:0 6px 18px rgba(0,0,0,.35); z-index:20;}
   .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:90px; background:var(--panel2); color:var(--paper);
-    padding:8px 16px; border-radius:20px; font-size:12.5px; border:1px solid var(--rule); z-index:30; opacity:0; transition:opacity .2s;}
+    padding:8px 16px; border-radius:20px; font-size:12.5px; border:1px solid var(--rule); z-index:999999; opacity:0; transition:opacity .2s;}
   .toast.show{opacity:1;}
   .overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:flex-end; justify-content:center;
     z-index:40; opacity:0; pointer-events:none; transition:opacity .18s;}
@@ -132,7 +132,7 @@ data = {
 =================================================================== */
 const STORE_KEY = "ledgerData";
 
-const DEFAULT_THEME = { ink: "#16241C", accent: "#C9A227", income: "#7FB69A", expense: "#C1614A" };
+const DEFAULT_THEME = { ink: "#000000", accent: "#C9A227", income: "#7FB69A", expense: "#C1614A" };
 
 const DEFAULT_SETTINGS = {
   initialBalance: 20000,

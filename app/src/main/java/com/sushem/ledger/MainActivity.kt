@@ -40,6 +40,7 @@ class MainActivity : AppCompatActivity() {
             val credential = GoogleAuthProvider.getCredential(account.idToken, null)
             firebaseAuth.signInWithCredential(credential).addOnCompleteListener(this) { authTask ->
                 if (authTask.isSuccessful) {
+                    upsertUserProfile()
                     notifyAuthState()
                 } else {
                     webView.evaluateJavascript("onSyncError('Sign-in failed, please try again')", null)
@@ -62,6 +63,17 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             webView.post { webView.evaluateJavascript("showToast('Could not read that file')", null) }
         }
+    }
+
+    private fun upsertUserProfile() {
+        val user = firebaseAuth.currentUser ?: return
+        val profile = hashMapOf(
+            "uid" to user.uid,
+            "displayName" to (user.displayName ?: ""),
+            "email" to (user.email ?: ""),
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        firestore.collection("users").document(user.uid).set(profile, SetOptions.merge())
     }
 
     private fun notifyAuthState() {
@@ -128,6 +140,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ---------- Firestore sync ----------
+        // Two separate collections, related only by uid:
+        //   users/{uid}       -> profile (uid, displayName, email, updatedAt)
+        //   ledgerData/{uid}  -> budget data (uid, ledgerData json, updatedAt)
         @JavascriptInterface
         fun syncToCloud(json: String) {
             val user = firebaseAuth.currentUser
@@ -136,12 +151,11 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             val payload = hashMapOf(
+                "uid" to user.uid,
                 "ledgerData" to json,
-                "displayName" to (user.displayName ?: ""),
-                "email" to (user.email ?: ""),
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            firestore.collection("users").document(user.uid)
+            firestore.collection("ledgerData").document(user.uid)
                 .set(payload, SetOptions.merge())
                 .addOnSuccessListener {
                     webView.post { webView.evaluateJavascript("onSyncComplete()", null) }
@@ -159,7 +173,7 @@ class MainActivity : AppCompatActivity() {
                 webView.post { webView.evaluateJavascript("onCloudDataLoaded(null)", null) }
                 return
             }
-            firestore.collection("users").document(user.uid).get()
+            firestore.collection("ledgerData").document(user.uid).get()
                 .addOnSuccessListener { doc ->
                     val json = doc.getString("ledgerData")
                     val js = if (json != null) "onCloudDataLoaded(${JSONObject.quote(json)})" else "onCloudDataLoaded(null)"

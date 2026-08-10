@@ -18,9 +18,14 @@ optionally syncs to your own Firebase project once you sign in with Google.
   signed in you get "Sync to cloud" (push what's on this phone to Firestore) and
   "Restore from cloud" (pull it back down — handy on a new phone). Sync is manual/explicit
   by design, same as the existing backup export/import, so nothing overwrites silently.
-- Firestore document layout: `users/{your-uid}` holds `ledgerData` (the same JSON blob
-  used for local backups), plus your `displayName`/`email` and an `updatedAt` timestamp.
-  Each user can only read/write their own document — see the security rules below.
+- Firestore uses two separate top-level collections, related only by `uid` (no nesting):
+  - `users/{uid}` — profile: `uid`, `displayName`, `email`, `updatedAt`. Written once at
+    sign-in.
+  - `ledgerData/{uid}` — your budget data: `uid`, `ledgerData` (the same JSON blob used
+    for local backups), `updatedAt`. Written whenever you tap "Sync to cloud".
+  Each collection is keyed by the same Firebase Auth `uid`, so joining them back together
+  (if you ever query them from outside the app) is a simple document-ID lookup, not a
+  nested read.
 
 *(Multi-month tracking, backup export/import, and the color-wheel theme editor from the
 previous build are all still here — see git history for their write-ups.)*
@@ -66,15 +71,22 @@ reads it at build time. None of this costs anything at this scale (Spark/free pl
        match /users/{userId} {
          allow read, write: if request.auth != null && request.auth.uid == userId;
        }
+       match /ledgerData/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
      }
    }
    ```
-   This makes sure a signed-in user can only ever read or write their *own* document —
-   nobody else's budget data is reachable, even though everyone shares the same database.
-   Click **Publish**.
+   This makes sure a signed-in user can only ever read or write their *own* documents in
+   either collection — nobody else's profile or budget data is reachable, even though
+   everyone shares the same database. Click **Publish**.
 
 That's it — steps 1–5 only need to happen once. From here on, building the app (via
 GitHub Actions or Android Studio, see below) picks up `google-services.json` automatically.
+
+> Already did this setup before this update? The rules above changed (a new `ledgerData`
+> collection was added) — go back to Firestore → Rules and re-publish with the version
+> shown here, or "Sync to cloud" will fail with a permission error.
 
 ---
 

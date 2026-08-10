@@ -1,66 +1,138 @@
 # Ledger — Android app
 
 A real, installable Android app for your monthly income/expense tracker. It wraps the
-same dashboard in a lightweight WebView, stores all data on-device with `localStorage`
-(no internet permission, no server, nothing leaves the phone), and works fully offline.
+dashboard in a lightweight WebView, stores data on-device with `localStorage`, and now
+optionally syncs to your own Firebase project once you sign in with Google.
 
 ## What's inside
 - `app/src/main/assets/index.html` — the entire app (dashboard, category breakdown,
-  "+" entry sheet, settings with add/remove category) as one self-contained HTML/JS file.
-- `MainActivity.kt` — a thin wrapper that loads that file into a full-screen WebView.
-- No external libraries, no CDN calls, no ads, no analytics.
+  "+" entry sheet, month navigation, settings, theme editor, backup export/import,
+  account/sync) as one self-contained HTML/JS file.
+- `MainActivity.kt` — loads that file into a full-screen WebView, plus a JS bridge that
+  hands off to native Android features: the share sheet & file picker for backups, and
+  Google Sign-In + Firestore for cloud sync.
+- No ads, no analytics, no third-party code beyond Firebase/Google Sign-In itself.
+
+## What's new in this build
+- **Google Sign-In + cloud sync**: Settings → Account → "Sign in with Google". Once
+  signed in you get "Sync to cloud" (push what's on this phone to Firestore) and
+  "Restore from cloud" (pull it back down — handy on a new phone). Sync is manual/explicit
+  by design, same as the existing backup export/import, so nothing overwrites silently.
+- Firestore document layout: `users/{your-uid}` holds `ledgerData` (the same JSON blob
+  used for local backups), plus your `displayName`/`email` and an `updatedAt` timestamp.
+  Each user can only read/write their own document — see the security rules below.
+
+*(Multi-month tracking, backup export/import, and the color-wheel theme editor from the
+previous build are all still here — see git history for their write-ups.)*
+
+---
+
+## Firebase setup (do this once, before your first build)
+
+The app won't build without a `google-services.json` from your own Firebase project —
+the file wires up your project's specific keys, and the google-services Gradle plugin
+reads it at build time. None of this costs anything at this scale (Spark/free plan).
+
+1. **Create the project** — go to [console.firebase.google.com](https://console.firebase.google.com),
+   **Add project**, name it whatever you like (e.g. "Ledger"), Google Analytics is optional
+   and can be skipped.
+
+2. **Register the Android app** — in the project, click the Android icon ("Add app").
+   - Android package name: `com.sushem.ledger` (must match exactly)
+   - App nickname: anything, e.g. "Ledger"
+   - Debug signing certificate SHA-1: use this value — it comes from the `debug.keystore`
+     already committed in this repo, so it's stable across every rebuild (local or CI):
+     ```
+     65:56:2B:02:A8:B2:73:21:6D:E6:5F:33:11:1F:12:32:61:DD:11:A7
+     ```
+   - Download the generated **`google-services.json`** and place it at `app/google-services.json`
+     in this project (same folder as `app/build.gradle.kts`).
+   - Commit that file and push it — the google-services plugin needs it present at build
+     time, including in GitHub Actions. It contains your project's public config (API key,
+     project ID etc.), not a secret credential; access is controlled by the Firestore rules
+     below plus the package name + SHA-1 check, which is standard practice for Android apps.
+
+3. **Turn on Google Sign-In** — in the Firebase console: **Build → Authentication →
+   Get started → Sign-in method → Google → Enable**. Pick a support email and save.
+
+4. **Turn on Firestore** — **Build → Firestore Database → Create database**. Choose a
+   location close to you, and start in **production mode** (we'll set rules next either way).
+
+5. **Lock down the security rules** — Firestore → **Rules**, replace the contents with:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+     }
+   }
+   ```
+   This makes sure a signed-in user can only ever read or write their *own* document —
+   nobody else's budget data is reachable, even though everyone shares the same database.
+   Click **Publish**.
+
+That's it — steps 1–5 only need to happen once. From here on, building the app (via
+GitHub Actions or Android Studio, see below) picks up `google-services.json` automatically.
+
+---
 
 ## Get an APK without installing anything (GitHub Actions)
 
 This project includes `.github/workflows/build-apk.yml`, which builds a debug APK
 automatically on GitHub's servers. Steps:
 
-1. Create a new **empty** repository on [github.com](https://github.com/new) — any name,
-   public or private both work. Don't add a README/gitignore when creating it (keeps it empty).
-2. Unzip this project on your computer, then from inside the `android-ledger-app` folder run:
+1. Create a new **empty** repository on [github.com](https://github.com/new) (or use your
+   existing `Ledger-app` repo). Don't add a README/gitignore when creating a new one.
+2. Unzip this project on your computer, make sure `app/google-services.json` from the
+   Firebase steps above is in place, then from inside the `android-ledger-app` folder run:
    ```
    git init
    git add .
-   git commit -m "Ledger app"
+   git commit -m "Ledger app with Firebase sync"
    git branch -M main
    git remote add origin https://github.com/<your-username>/<your-repo>.git
    git push -u origin main
    ```
+   (If you're updating your existing repo instead, just copy these files over your local
+   clone, `git add -A`, commit, and push as usual.)
 3. On GitHub, open your repo → **Actions** tab. A workflow run called "Build APK" starts
    automatically (takes ~2–4 minutes).
 4. Once it finishes (green check), click into that run → scroll to **Artifacts** →
    download **ledger-debug-apk**. It's a zip containing `app-debug.apk`.
-5. Transfer that `.apk` to your phone (email it to yourself, Google Drive, USB, whatever's
-   easiest) and open it there. Android will ask to allow "install unknown apps" for
-   whichever app you used to open it — allow that once, then tap install.
+5. Transfer that `.apk` to your phone and open it there. Android will ask to allow
+   "install unknown apps" for whichever app you used to open it — allow that once, then
+   tap install.
 
-No Android Studio, no SDK, nothing installed on your machine — GitHub's runners do the
-actual compiling. You can re-trigger a build any time from the Actions tab via
-"Run workflow" (the `workflow_dispatch` trigger), without needing a new push.
+You can re-trigger a build any time from the Actions tab via "Run workflow", without
+needing a new push.
 
 ## Alternative: build locally in Android Studio
 
-1. Install [Android Studio](https://developer.android.com/studio) (free) on your computer.
+1. Install [Android Studio](https://developer.android.com/studio) (free).
 2. Open Android Studio → **Open** → select this `android-ledger-app` folder.
-3. Let it sync (first sync downloads Gradle 8.7 automatically — needs internet just this once).
-4. Plug in your Android phone via USB with **USB debugging** enabled (Settings → Developer
-   options), or use an emulator.
-5. Click the green **Run ▶** button. The app installs and opens as "Ledger" with its own
-   icon — from then on it launches like any other app, fully offline.
+3. Make sure `app/google-services.json` is present (Firebase setup above).
+4. Let it sync (first sync downloads Gradle 8.7 — needs internet just this once).
+5. Plug in your phone via USB with **USB debugging** enabled, or use an emulator, and
+   click **Run ▶**.
 
-### To get an APK you can share/sideload without a cable
-Build menu → **Build Bundle(s) / APK(s)** → **Build APK(s)**. Android Studio will show a
-"locate" link to the generated `app-debug.apk` — copy that onto your phone and open it
-to install (you'll need to allow "install unknown apps" for whichever app you transfer it with).
+### To get a shareable APK
+Build menu → **Build Bundle(s) / APK(s)** → **Build APK(s)** → use the "locate" link for
+`app-debug.apk`.
 
 ## Editing the app
 Everything about the app's look and behavior lives in one file:
-`app/src/main/assets/index.html`. Change colors, categories, or layout there and re-run —
-no need to touch the Kotlin code unless you want to add native Android features later
-(notifications, widgets, biometric lock, etc.).
+`app/src/main/assets/index.html`. Native features (sign-in, file sharing, Firestore) live
+in `MainActivity.kt`. Change the HTML file for UI/behavior tweaks; touch the Kotlin file
+only if you're adding new native capabilities.
 
 ## Notes
-- minSdk 26 (Android 8.0+), covers the large majority of phones in use today.
-- Data is stored per-app in the WebView's local storage. Uninstalling the app clears it —
-  there's no cloud backup built in. If you want that, the natural next step is swapping
-  `localStorage` for a small SQLite/Room database, which would also make export/backup easier.
+- minSdk 26 (Android 8.0+).
+- Local data lives in the WebView's `localStorage` regardless of sign-in state — signing
+  in and syncing is opt-in, not required to use the app.
+- `app/debug.keystore` is committed on purpose so every build (local or CI) shares one
+  signing certificate, keeping the SHA-1 registered with Firebase valid across rebuilds.
+  This is a *debug*-only key with well-known, non-secret credentials (standard Android
+  debug keystore convention) — don't reuse it for a Play Store release build, which should
+  get its own private release key.

@@ -357,7 +357,10 @@ function showToast(msg){
 
 /* ---------------- add entry sheet ---------------- */
 let addState = { type:"expense" };
+let currentSheet = null;
+let authUser = null; // {uid, name, email, photo} | null
 function openAdd(){
+  currentSheet = "add";
   addState = { type:"expense" };
   const cats = data.settings.categories.expense;
   renderOverlay(`
@@ -416,6 +419,7 @@ function submitAdd(){
 /* ---------------- settings sheet ---------------- */
 let settingsDraft = null;
 function openSettings(){
+  currentSheet = "settings";
   settingsDraft = JSON.parse(JSON.stringify(data.settings));
   renderSettingsSheet();
 }
@@ -437,6 +441,26 @@ function renderSettingsSheet(){
       <div class="sheet-head">
         <div class="sheet-title display">Settings</div>
         <button class="close-btn" onclick="closeOverlay()">&times;</button>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title display">Account</div>
+        ${authUser ? `
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            ${authUser.photo ? `<img src="${esc(authUser.photo)}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;" />`
+              : `<div style="width:38px;height:38px;border-radius:50%;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;">${esc((authUser.name||authUser.email||"?").charAt(0).toUpperCase())}</div>`}
+            <div style="min-width:0;">
+              <div style="font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(authUser.name||"Signed in")}</div>
+              <div style="font-size:11.5px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(authUser.email||"")}</div>
+            </div>
+          </div>
+          <button class="secondary-btn" onclick="syncToCloud()">Sync to cloud</button>
+          <button class="secondary-btn" onclick="restoreFromCloud()">Restore from cloud</button>
+          <button class="secondary-btn" onclick="nativeSignOut()">Sign out</button>
+        ` : `
+          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your ledger to the cloud and use it across devices.</div>
+          <button class="primary-btn" style="margin-top:0;" onclick="nativeSignIn()">Sign in with Google</button>
+        `}
       </div>
 
       <div class="settings-section">
@@ -754,6 +778,39 @@ function resetTheme(){
   showToast("Theme reset");
 }
 
+/* ---------------- account: Google sign-in + cloud sync ---------------- */
+function nativeSignIn(){
+  if(window.Android && window.Android.signIn) window.Android.signIn();
+  else showToast("Google Sign-In is only available in the Android app");
+}
+function nativeSignOut(){
+  if(window.Android && window.Android.signOut) window.Android.signOut();
+  else showToast("Google Sign-In is only available in the Android app");
+}
+function syncToCloud(){
+  if(window.Android && window.Android.syncToCloud){
+    window.Android.syncToCloud(JSON.stringify(data));
+    showToast("Syncing…");
+  } else showToast("Cloud sync is only available in the Android app");
+}
+function restoreFromCloud(){
+  if(window.Android && window.Android.loadFromCloud){
+    window.Android.loadFromCloud();
+    showToast("Checking cloud…");
+  } else showToast("Cloud sync is only available in the Android app");
+}
+// called by the native Android bridge whenever sign-in state changes
+function onAuthStateChanged(uid, name, email, photo){
+  authUser = uid ? { uid, name, email, photo } : null;
+  if(currentSheet === "settings") renderSettingsSheet();
+}
+function onSyncComplete(){ showToast("Synced to cloud"); }
+function onSyncError(msg){ showToast(msg || "Sync failed"); }
+function onCloudDataLoaded(jsonStrOrNull){
+  if(!jsonStrOrNull){ showToast("No cloud backup found yet"); return; }
+  applyImportedJson(jsonStrOrNull);
+}
+
 /* ---------------- backup: export / import ---------------- */
 function exportBackup(){
   const json = JSON.stringify(data, null, 2);
@@ -815,6 +872,7 @@ function renderOverlay(html){
   requestAnimationFrame(()=>ov.classList.add("show"));
 }
 function closeOverlay(){
+  currentSheet = null;
   const ov = document.getElementById("overlay");
   ov.classList.remove("show");
   setTimeout(()=>{ ov.innerHTML=""; }, 180);

@@ -12,7 +12,20 @@
           "package_name": "com.sushem.ledger"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "132675546899-9etgf0bbf7iuvj1bpenmfeujds1jtck4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sushem.ledger",
+            "certificate_hash": "65562b02a8b273216de65f33111f123261dd11a7"
+          }
+        },
+        {
+          "client_id": "132675546899-f0hinkpckom8an0l0r56d8o1a1oupj9b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC1riS6_Q-SdYw0qpdciSbHIPWRoYuVXQQ"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "132675546899-f0hinkpckom8an0l0r56d8o1a1oupj9b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -259,12 +259,12 @@ function render(){
   document.getElementById("app").innerHTML = `
     <header>
       <div style="display:flex; align-items:center; gap:10px;">
-        // <img src="logo.png" alt="" style="width:34px; height:34px; border-radius:9px; flex-shrink:0;" />
+        <img src="logo.png" alt="" style="width:34px; height:34px; border-radius:9px; flex-shrink:0;" />
         <div>
           <div class="eyebrow mono">MONTHLY LEDGER</div>
           <div class="month-nav">
             <button onclick="navMonth(-1)">&#8249;</button>
-            <div class="display" style="font-size:22px; font-weight:600; min-width:150px; text-align:center;">${esc(monthTitle(viewMonth))}</div>
+            <divclass="display"style="font-size:22px;font-weight:600;flex:1;min-width:0;max-width:150px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(monthTitle(viewMonth))}</divclass=>
             <button onclick="navMonth(1)">&#8250;</button>
           </div>
         </div>

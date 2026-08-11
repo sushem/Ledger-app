@@ -87,6 +87,25 @@ class MainActivity : AppCompatActivity() {
         webView.post { webView.evaluateJavascript(js, null) }
     }
 
+    private fun monthDisplayName(key: String): String {
+        val parts = key.split("-")
+        val monthIdx = parts.getOrNull(1)?.toIntOrNull()
+        val monthNames = listOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+        val name = monthIdx?.let { monthNames.getOrNull(it - 1) } ?: return key
+        return "$name ${parts[0]}"
+    }
+
+    private fun uniqueSheetName(base: String, used: MutableSet<String>): String {
+        var candidate = base.replace(Regex("[\\\\/?*\\[\\]:]"), " ").trim().take(31).ifBlank { "Sheet" }
+        var i = 2
+        while (!used.add(candidate)) {
+            val suffix = " ($i)"
+            candidate = (base.take(31 - suffix.length)) + suffix
+            i++
+        }
+        return candidate
+    }
+
     inner class WebAppInterface {
 
         // ---------- backup export/import ----------
@@ -108,6 +127,79 @@ class MainActivity : AppCompatActivity() {
                     webView.evaluateJavascript("onNativeExportStarted()", null)
                 } catch (e: Exception) {
                     webView.evaluateJavascript("showToast('Export failed')", null)
+                }
+            }
+        }
+
+        // ---------- Excel export: Summary sheet + one sheet per month ----------
+        @JavascriptInterface
+        fun exportExcel(json: String) {
+            runOnUiThread {
+                try {
+                    val parsed = JSONObject(json)
+                    val monthsObj = parsed.optJSONObject("months") ?: JSONObject()
+                    val settingsObj = parsed.optJSONObject("settings") ?: JSONObject()
+                    val initialBalance = settingsObj.optDouble("initialBalance", 0.0)
+                    val monthKeys = monthsObj.keys().asSequence().toList().sorted()
+
+                    val sheets = mutableListOf<Pair<String, List<List<Any>>>>()
+                    val usedNames = mutableSetOf<String>()
+
+                    // --- Summary sheet ---
+                    val summaryRows = mutableListOf<List<Any>>()
+                    summaryRows.add(listOf("Month", "Opening Balance", "Income", "Expense", "Closing Balance"))
+                    var running = initialBalance
+                    monthKeys.forEach { key ->
+                        val txArray = monthsObj.getJSONArray(key)
+                        var income = 0.0
+                        var expense = 0.0
+                        for (i in 0 until txArray.length()) {
+                            val t = txArray.getJSONObject(i)
+                            val amt = t.optDouble("amount", 0.0)
+                            if (t.optString("type") == "income") income += amt else expense += amt
+                        }
+                        val opening = running
+                        val closing = opening + income - expense
+                        running = closing
+                        summaryRows.add(listOf(monthDisplayName(key), opening, income, expense, closing))
+                    }
+                    sheets.add(uniqueSheetName("Summary", usedNames) to summaryRows)
+
+                    // --- One sheet per month ---
+                    monthKeys.forEach { key ->
+                        val txArray = monthsObj.getJSONArray(key)
+                        val rows = mutableListOf<List<Any>>()
+                        rows.add(listOf("Date", "Type", "Category", "Description", "Amount"))
+                        for (i in 0 until txArray.length()) {
+                            val t = txArray.getJSONObject(i)
+                            rows.add(
+                                listOf(
+                                    t.optString("date"),
+                                    t.optString("type"),
+                                    t.optString("category"),
+                                    t.optString("description"),
+                                    t.optDouble("amount", 0.0)
+                                )
+                            )
+                        }
+                        sheets.add(uniqueSheetName(monthDisplayName(key), usedNames) to rows)
+                    }
+
+                    val dir = File(cacheDir, "shared").apply { mkdirs() }
+                    val file = File(dir, "ledger-export-${System.currentTimeMillis()}.xlsx")
+                    FileOutputStream(file).use { out -> XlsxWriter.write(out, sheets) }
+
+                    val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
+                    val intent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(intent, "Save Ledger Excel export"))
+                    webView.evaluateJavascript("onNativeExportStarted()", null)
+                } catch (e: Exception) {
+                    val msg = JSONObject.quote("Excel export failed: ${e.message ?: "unknown error"}")
+                    webView.evaluateJavascript("showToast($msg)", null)
                 }
             }
         }

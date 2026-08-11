@@ -14,6 +14,25 @@ optionally syncs to your own Firebase project once you sign in with Google.
 - No ads, no analytics, no third-party code beyond Firebase/Google Sign-In itself.
 
 ## What's new in this build
+- **Debug and release build variants**: CI now builds and uploads both — see
+  `ledger-debug-apk` and `ledger-release-apk` under each Actions run's Artifacts.
+  Both are signed with the same committed `debug.keystore` (see the signing note further
+  down), so either installs fine by sideloading; release just has `debuggable=false` and
+  no `-debug` suffix on the version name.
+- **Firebase Analytics**: `firebase-analytics` is included for basic usage tracking
+  (screen views, session counts) — no event code has been added beyond what Firebase
+  collects automatically. If your Firebase project was created without Analytics enabled,
+  turn it on under Project Settings → Integrations → Google Analytics, or events won't
+  show up in the Firebase console.
+- **Export as Excel**: Settings → Backup → "Export as Excel (.xlsx)". Generates a workbook
+  with a **Summary** sheet (opening/income/expense/closing balance per month) plus one
+  sheet per month with every transaction, and hands it to the share sheet like the other
+  exports. Built with a small hand-written OOXML writer instead of a library like Apache
+  POI, which has a history of Android compatibility problems (method-count bloat, JVM-only
+  XML APIs) that aren't worth the risk here.
+- **Loading state on Sync/Restore**: both buttons now show a spinner and disable
+  themselves while the Firestore call is in flight, so it's clear something's happening
+  on a slow connection instead of looking unresponsive.
 - **Google Sign-In + cloud sync**: Settings → Account → "Sign in with Google". Once
   signed in you get "Sync to cloud" (push what's on this phone to Firestore) and
   "Restore from cloud" (pull it back down — handy on a new phone). Sync is manual/explicit
@@ -27,8 +46,8 @@ optionally syncs to your own Firebase project once you sign in with Google.
   (if you ever query them from outside the app) is a simple document-ID lookup, not a
   nested read.
 
-*(Multi-month tracking, backup export/import, and the color-wheel theme editor from the
-previous build are all still here — see git history for their write-ups.)*
+*(Multi-month tracking, backup export/import, and the color-wheel theme editor from
+earlier builds are all still here — see git history for their write-ups.)*
 
 ---
 
@@ -143,8 +162,9 @@ only if you're adding new native capabilities.
 - minSdk 26 (Android 8.0+).
 - Local data lives in the WebView's `localStorage` regardless of sign-in state — signing
   in and syncing is opt-in, not required to use the app.
-- `app/debug.keystore` is committed on purpose so every build (local or CI) shares one
-  signing certificate, keeping the SHA-1 registered with Firebase valid across rebuilds.
-  This is a *debug*-only key with well-known, non-secret credentials (standard Android
-  debug keystore convention) — don't reuse it for a Play Store release build, which should
-  get its own private release key.
+- `app/debug.keystore` is committed on purpose and now signs **both** the debug and
+  release build types, keeping the SHA-1 registered with Firebase valid for either one.
+  This is a well-known, non-secret debug-style key (standard Android debug keystore
+  convention) — fine for sideloading to your own devices, but if you ever publish this
+  to the Play Store, generate a proper private release key instead and register its
+  SHA-1 with Firebase too (Firebase supports multiple fingerprints per app).

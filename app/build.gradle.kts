@@ -16,11 +16,19 @@ android {
         versionName = "1.0"
     }
 
-    // Committed debug.keystore -> every build (local or CI) is signed with the SAME
-    // certificate, so the SHA-1 you register with Firebase for Google Sign-In stays
-    // valid across rebuilds. See README "Firebase setup" for the fingerprint.
+    // Committed debug.keystore -> every build (local or CI), debug or release, is signed
+    // with the SAME certificate, so the SHA-1 you register with Firebase for Google
+    // Sign-In stays valid for both variants. See README "Firebase setup" for the
+    // fingerprint. (For a real Play Store release you'd want a separate, private release
+    // key — see the note in README.)
     signingConfigs {
         getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        create("release") {
             storeFile = file("debug.keystore")
             storePassword = "android"
             keyAlias = "androiddebugkey"
@@ -31,9 +39,13 @@ android {
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("debug")
+            versionNameSuffix = "-debug"
         }
         release {
-            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false // keep off: WebView JS-interface methods rely on
+            // reflection (@JavascriptInterface), and R8/ProGuard can strip or rename them
+            // without careful keep rules — not worth the risk for this app's size.
         }
     }
 
@@ -57,7 +69,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")
-    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-analytics") // basic usage tracking
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.2.0")

@@ -84,6 +84,10 @@
     font-weight:700; font-size:14.5px; margin-top:6px;}
   .secondary-btn{width:100%; padding:12px 0; border-radius:10px; border:1px solid var(--rule); background:var(--panel2);
     color:var(--paper); font-weight:600; font-size:13.5px; margin-top:8px;}
+  .secondary-btn:disabled, .primary-btn:disabled{opacity:.6;}
+  .btn-spinner{display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.35);
+    border-top-color:currentColor; border-radius:50%; animation:spin .7s linear infinite; margin-right:7px; vertical-align:-2px;}
+  @keyframes spin{ to{ transform:rotate(360deg); } }
   .err{color:var(--rust); font-size:12.5px; margin-bottom:10px;}
   .cat-manage-row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;}
   .cat-manage-row span{font-size:13px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -454,8 +458,8 @@ function renderSettingsSheet(){
               <div style="font-size:11.5px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(authUser.email||"")}</div>
             </div>
           </div>
-          <button class="secondary-btn" onclick="syncToCloud()">Sync to cloud</button>
-          <button class="secondary-btn" onclick="restoreFromCloud()">Restore from cloud</button>
+          <button class="secondary-btn" id="syncBtn" onclick="syncToCloud()">Sync to cloud</button>
+          <button class="secondary-btn" id="restoreBtn" onclick="restoreFromCloud()">Restore from cloud</button>
           <button class="secondary-btn" onclick="nativeSignOut()">Sign out</button>
         ` : `
           <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your ledger to the cloud and use it across devices.</div>
@@ -506,6 +510,7 @@ function renderSettingsSheet(){
         <div class="settings-section-title display">Backup</div>
         <button class="secondary-btn" onclick="exportBackup()">Export data</button>
         <button class="secondary-btn" onclick="importBackup()">Import data</button>
+        <button class="secondary-btn" onclick="exportExcel()">Export as Excel (.xlsx)</button>
       </div>
 
       <button class="primary-btn" onclick="submitSettings()">Save settings</button>
@@ -779,6 +784,19 @@ function resetTheme(){
 }
 
 /* ---------------- account: Google sign-in + cloud sync ---------------- */
+function setBtnLoading(id, loadingText){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  if(btn.dataset.originalText === undefined) btn.dataset.originalText = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="btn-spinner"></span>${loadingText}`;
+}
+function clearBtnLoading(id){
+  const btn = document.getElementById(id);
+  if(!btn) return;
+  btn.disabled = false;
+  btn.textContent = btn.dataset.originalText !== undefined ? btn.dataset.originalText : btn.textContent;
+}
 function nativeSignIn(){
   if(window.Android && window.Android.signIn) window.Android.signIn();
   else showToast("Google Sign-In is only available in the Android app");
@@ -789,14 +807,14 @@ function nativeSignOut(){
 }
 function syncToCloud(){
   if(window.Android && window.Android.syncToCloud){
+    setBtnLoading("syncBtn", "Syncing…");
     window.Android.syncToCloud(JSON.stringify(data));
-    showToast("Syncing…");
   } else showToast("Cloud sync is only available in the Android app");
 }
 function restoreFromCloud(){
   if(window.Android && window.Android.loadFromCloud){
+    setBtnLoading("restoreBtn", "Restoring…");
     window.Android.loadFromCloud();
-    showToast("Checking cloud…");
   } else showToast("Cloud sync is only available in the Android app");
 }
 // called by the native Android bridge whenever sign-in state changes
@@ -804,14 +822,23 @@ function onAuthStateChanged(uid, name, email, photo){
   authUser = uid ? { uid, name, email, photo } : null;
   if(currentSheet === "settings") renderSettingsSheet();
 }
-function onSyncComplete(){ showToast("Synced to cloud"); }
-function onSyncError(msg){ showToast(msg || "Sync failed"); }
+function onSyncComplete(){ clearBtnLoading("syncBtn"); showToast("Synced to cloud"); }
+function onSyncError(msg){ clearBtnLoading("syncBtn"); showToast(msg || "Sync failed"); }
 function onCloudDataLoaded(jsonStrOrNull){
+  clearBtnLoading("restoreBtn");
   if(!jsonStrOrNull){ showToast("No cloud backup found yet"); return; }
   applyImportedJson(jsonStrOrNull);
 }
 
 /* ---------------- backup: export / import ---------------- */
+function exportExcel(){
+  if(window.Android && window.Android.exportExcel){
+    window.Android.exportExcel(JSON.stringify(data));
+    showToast("Preparing Excel file…");
+  } else {
+    showToast("Excel export is only available in the Android app");
+  }
+}
 function exportBackup(){
   const json = JSON.stringify(data, null, 2);
   if(window.Android && window.Android.exportData){

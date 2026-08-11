@@ -139,7 +139,7 @@ const STORE_KEY = "ledgerData";
 const DEFAULT_THEME = { ink: "#000000", accent: "#C9A227", income: "#7FB69A", expense: "#C1614A" };
 
 const DEFAULT_SETTINGS = {
-  initialBalance: 20000,
+  initialBalance: 0,
   categories: {
     expense: ["Food","Gifts","Health/medical","Home","Transportation","Utilities","Investments","Other"],
     income: ["Paycheck","Bonus","Interest","Savings","Other"]
@@ -154,15 +154,7 @@ function monthKeyOf(dateStr){ return dateStr.slice(0,7); }
 function currentMonthKey(){ return new Date().toISOString().slice(0,7); }
 
 function seedMonths(){
-  const seed = [
-    {id:"t1",type:"income",amount:30698,category:"Paycheck",description:"Monthly salary",date:isoDaysAgo(29)},
-    {id:"t2",type:"expense",amount:15011,category:"Home",description:"Rent / society fee",date:isoDaysAgo(28)},
-    {id:"t3",type:"expense",amount:2000,category:"Investments",description:"SIP transfer",date:isoDaysAgo(27)},
-    {id:"t4",type:"expense",amount:671,category:"Food",description:"Groceries",date:isoDaysAgo(24)},
-    {id:"t5",type:"expense",amount:500,category:"Transportation",description:"Fuel",date:isoDaysAgo(20)},
-    {id:"t6",type:"expense",amount:130,category:"Utilities",description:"Internet bill",date:isoDaysAgo(15)},
-    {id:"t7",type:"expense",amount:890,category:"Other",description:"Misc shopping",date:isoDaysAgo(8)}
-  ];
+  const seed = [];
   const months = {};
   seed.forEach(t=>{ const k = monthKeyOf(t.date); (months[k] = months[k] || []).push(t); });
   return months;

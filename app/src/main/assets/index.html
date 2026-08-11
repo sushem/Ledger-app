@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<title>Ledger</title>
+<title>Expense Tracker</title>
 <style>
   :root{
     --ink:#000000; --panel:#000000; --panel2:#000000; --paper:#EDE7D8;
@@ -259,7 +259,7 @@ function render(){
   document.getElementById("app").innerHTML = `
     <header>
       <div>
-        <div class="eyebrow mono">MONTHLY LEDGER</div>
+        <div class="eyebrow mono">MONTHLY Expense Tracker</div>
         <div class="month-nav">
           <button onclick="navMonth(-1)">&#8249;</button>
           <div class="display" style="font-size:22px; font-weight:600; min-width:150px; text-align:center;">${esc(monthTitle(viewMonth))}</div>
@@ -454,7 +454,7 @@ function renderSettingsSheet(){
           <button class="secondary-btn" id="restoreBtn" onclick="restoreFromCloud()">Restore from cloud</button>
           <button class="secondary-btn" onclick="nativeSignOut()">Sign out</button>
         ` : `
-          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your ledger to the cloud and use it across devices.</div>
+          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your Expense Tracker to the cloud and use it across devices.</div>
           <button class="primary-btn" style="margin-top:0;" onclick="nativeSignIn()">Sign in with Google</button>
         `}
       </div>
@@ -841,7 +841,7 @@ function exportBackup(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ledger-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `Expense Tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }

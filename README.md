@@ -1,4 +1,4 @@
-# Ledger — Android app
+# Expense Tracker — Android app
 
 A real, installable Android app for your monthly income/expense tracker. It wraps the
 dashboard in a lightweight WebView, stores data on-device with `localStorage`, and now
@@ -15,7 +15,7 @@ optionally syncs to your own Firebase project once you sign in with Google.
 
 ## What's new in this build
 - **Debug and release build variants**: CI now builds and uploads both — see
-  `ledger-debug-apk` and `ledger-release-apk` under each Actions run's Artifacts.
+  `Expense Tracker-debug-apk` and `Expense Tracker-release-apk` under each Actions run's Artifacts.
   Both are signed with the same committed `debug.keystore` (see the signing note further
   down), so either installs fine by sideloading; release just has `debuggable=false` and
   no `-debug` suffix on the version name.
@@ -40,7 +40,7 @@ optionally syncs to your own Firebase project once you sign in with Google.
 - Firestore uses two separate top-level collections, related only by `uid` (no nesting):
   - `users/{uid}` — profile: `uid`, `displayName`, `email`, `updatedAt`. Written once at
     sign-in.
-  - `ledgerData/{uid}` — your budget data: `uid`, `ledgerData` (the same JSON blob used
+  - `Expense TrackerData/{uid}` — your budget data: `uid`, `Expense TrackerData` (the same JSON blob used
     for local backups), `updatedAt`. Written whenever you tap "Sync to cloud".
   Each collection is keyed by the same Firebase Auth `uid`, so joining them back together
   (if you ever query them from outside the app) is a simple document-ID lookup, not a
@@ -58,12 +58,12 @@ the file wires up your project's specific keys, and the google-services Gradle p
 reads it at build time. None of this costs anything at this scale (Spark/free plan).
 
 1. **Create the project** — go to [console.firebase.google.com](https://console.firebase.google.com),
-   **Add project**, name it whatever you like (e.g. "Ledger"), Google Analytics is optional
+   **Add project**, name it whatever you like (e.g. "Expense Tracker"), Google Analytics is optional
    and can be skipped.
 
 2. **Register the Android app** — in the project, click the Android icon ("Add app").
-   - Android package name: `com.sushem.ledger` (must match exactly)
-   - App nickname: anything, e.g. "Ledger"
+   - Android package name: `com.sushem.Expense Tracker` (must match exactly)
+   - App nickname: anything, e.g. "Expense Tracker"
    - Debug signing certificate SHA-1: use this value — it comes from the `debug.keystore`
      already committed in this repo, so it's stable across every rebuild (local or CI):
      ```
@@ -90,7 +90,7 @@ reads it at build time. None of this costs anything at this scale (Spark/free pl
        match /users/{userId} {
          allow read, write: if request.auth != null && request.auth.uid == userId;
        }
-       match /ledgerData/{userId} {
+       match /Expense TrackerData/{userId} {
          allow read, write: if request.auth != null && request.auth.uid == userId;
        }
      }
@@ -103,7 +103,7 @@ reads it at build time. None of this costs anything at this scale (Spark/free pl
 That's it — steps 1–5 only need to happen once. From here on, building the app (via
 GitHub Actions or Android Studio, see below) picks up `google-services.json` automatically.
 
-> Already did this setup before this update? The rules above changed (a new `ledgerData`
+> Already did this setup before this update? The rules above changed (a new `Expense TrackerData`
 > collection was added) — go back to Firestore → Rules and re-publish with the version
 > shown here, or "Sync to cloud" will fail with a permission error.
 
@@ -115,13 +115,13 @@ This project includes `.github/workflows/build-apk.yml`, which builds a debug AP
 automatically on GitHub's servers. Steps:
 
 1. Create a new **empty** repository on [github.com](https://github.com/new) (or use your
-   existing `Ledger-app` repo). Don't add a README/gitignore when creating a new one.
+   existing `Expense Tracker-app` repo). Don't add a README/gitignore when creating a new one.
 2. Unzip this project on your computer, make sure `app/google-services.json` from the
-   Firebase steps above is in place, then from inside the `android-ledger-app` folder run:
+   Firebase steps above is in place, then from inside the `android-Expense Tracker-app` folder run:
    ```
    git init
    git add .
-   git commit -m "Ledger app with Firebase sync"
+   git commit -m "Expense Tracker app with Firebase sync"
    git branch -M main
    git remote add origin https://github.com/<your-username>/<your-repo>.git
    git push -u origin main
@@ -131,7 +131,7 @@ automatically on GitHub's servers. Steps:
 3. On GitHub, open your repo → **Actions** tab. A workflow run called "Build APK" starts
    automatically (takes ~2–4 minutes).
 4. Once it finishes (green check), click into that run → scroll to **Artifacts** →
-   download **ledger-debug-apk**. It's a zip containing `app-debug.apk`.
+   download **Expense Tracker-debug-apk**. It's a zip containing `app-debug.apk`.
 5. Transfer that `.apk` to your phone and open it there. Android will ask to allow
    "install unknown apps" for whichever app you used to open it — allow that once, then
    tap install.
@@ -142,7 +142,7 @@ needing a new push.
 ## Alternative: build locally in Android Studio
 
 1. Install [Android Studio](https://developer.android.com/studio) (free).
-2. Open Android Studio → **Open** → select this `android-ledger-app` folder.
+2. Open Android Studio → **Open** → select this `android-Expense Tracker-app` folder.
 3. Make sure `app/google-services.json` is present (Firebase setup above).
 4. Let it sync (first sync downloads Gradle 8.7 — needs internet just this once).
 5. Plug in your phone via USB with **USB debugging** enabled, or use an emulator, and

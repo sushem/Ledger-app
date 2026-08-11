@@ -1,4 +1,4 @@
-package com.sushem.ledger
+package com.sushem.expenseTracker
 
 import java.io.OutputStream
 import java.util.zip.ZipEntry

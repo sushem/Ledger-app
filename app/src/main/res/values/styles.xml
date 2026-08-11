@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.Ledger" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <style name="Theme.expenseTracker" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">#16241C</item>
         <item name="colorPrimary">#C9A227</item>

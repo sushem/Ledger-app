@@ -1,4 +1,4 @@
-package com.sushem.ledger
+package com.sushem.expenseTracker
 
 import android.content.Intent
 import android.os.Bundle
@@ -114,7 +114,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 try {
                     val dir = File(cacheDir, "shared").apply { mkdirs() }
-                    val file = File(dir, "ledger-backup-${System.currentTimeMillis()}.json")
+                    val file = File(dir, "expenseTracker-backup-${System.currentTimeMillis()}.json")
                     FileOutputStream(file).use { it.write(json.toByteArray()) }
                     val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
 
@@ -123,7 +123,7 @@ class MainActivity : AppCompatActivity() {
                         putExtra(Intent.EXTRA_STREAM, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    startActivity(Intent.createChooser(intent, "Save Ledger backup"))
+                    startActivity(Intent.createChooser(intent, "Save expenseTracker backup"))
                     webView.evaluateJavascript("onNativeExportStarted()", null)
                 } catch (e: Exception) {
                     webView.evaluateJavascript("showToast('Export failed')", null)
@@ -186,7 +186,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val dir = File(cacheDir, "shared").apply { mkdirs() }
-                    val file = File(dir, "ledger-export-${System.currentTimeMillis()}.xlsx")
+                    val file = File(dir, "expenseTracker-export-${System.currentTimeMillis()}.xlsx")
                     FileOutputStream(file).use { out -> XlsxWriter.write(out, sheets) }
 
                     val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                         putExtra(Intent.EXTRA_STREAM, uri)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    startActivity(Intent.createChooser(intent, "Save Ledger Excel export"))
+                    startActivity(Intent.createChooser(intent, "Save expenseTracker Excel export"))
                     webView.evaluateJavascript("onNativeExportStarted()", null)
                 } catch (e: Exception) {
                     val msg = JSONObject.quote("Excel export failed: ${e.message ?: "unknown error"}")
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         // ---------- Firestore sync ----------
         // Two separate collections, related only by uid:
         //   users/{uid}       -> profile (uid, displayName, email, updatedAt)
-        //   ledgerData/{uid}  -> budget data (uid, ledgerData json, updatedAt)
+        //   expenseTrackerData/{uid}  -> budget data (uid, expenseTrackerData json, updatedAt)
         @JavascriptInterface
         fun syncToCloud(json: String) {
             val user = firebaseAuth.currentUser
@@ -244,10 +244,10 @@ class MainActivity : AppCompatActivity() {
             }
             val payload = hashMapOf(
                 "uid" to user.uid,
-                "ledgerData" to json,
+                "expenseTrackerData" to json,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            firestore.collection("ledgerData").document(user.uid)
+            firestore.collection("expenseTrackerData").document(user.uid)
                 .set(payload, SetOptions.merge())
                 .addOnSuccessListener {
                     webView.post { webView.evaluateJavascript("onSyncComplete()", null) }
@@ -265,9 +265,9 @@ class MainActivity : AppCompatActivity() {
                 webView.post { webView.evaluateJavascript("onCloudDataLoaded(null)", null) }
                 return
             }
-            firestore.collection("ledgerData").document(user.uid).get()
+            firestore.collection("expenseTrackerData").document(user.uid).get()
                 .addOnSuccessListener { doc ->
-                    val json = doc.getString("ledgerData")
+                    val json = doc.getString("expenseTrackerData")
                     val js = if (json != null) "onCloudDataLoaded(${JSONObject.quote(json)})" else "onCloudDataLoaded(null)"
                     webView.post { webView.evaluateJavascript(js, null) }
                 }

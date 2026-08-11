@@ -24,17 +24,57 @@ jobs:
           gradle-version: 8.7
           cache-disabled: true
 
-      - name: Build debug and release APKs
-        run: gradle assembleDebug assembleRelease
+      - name: Build debug APK
+        run: gradle assembleDebug
 
       - name: Upload debug APK
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: expenseTracker-debug-apk
+          name: ledger-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Build release APK
+        run: gradle assembleRelease
 
       - name: Upload release APK
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: expenseTracker-release-apk
+          name: ledger-release-apk
           path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download debug APK
+        uses: actions/download-artifact@v7
+        with:
+          name: ledger-debug-apk
+          path: apks
+
+      - name: Download release APK
+        uses: actions/download-artifact@v7
+        with:
+          name: ledger-release-apk
+          path: apks
+
+      - name: Create GitHub Release with APKs attached
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}.
+            - `app-debug.apk` — debuggable, for testing
+            - `app-release.apk` — release build type (still signed with the shared debug.keystore, see README)
+          files: |
+            apks/app-debug.apk
+            apks/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

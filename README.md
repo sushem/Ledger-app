@@ -130,14 +130,21 @@ automatically on GitHub's servers. Steps:
    clone, `git add -A`, commit, and push as usual.)
 3. On GitHub, open your repo → **Actions** tab. A workflow run called "Build APK" starts
    automatically (takes ~2–4 minutes).
-4. Once it finishes (green check), click into that run → scroll to **Artifacts** →
-   download **Expense Tracker-debug-apk**. It's a zip containing `app-debug.apk`.
+4. Once it finishes (green check), the APKs are available two ways:
+   - **GitHub Releases** (easiest, doesn't expire): open your repo's **Releases** page
+     (right sidebar, or `github.com/<you>/<repo>/releases`) — each build publishes a new
+     release named "Build \<run number\>" with `app-debug.apk` and `app-release.apk`
+     attached directly. Just click a file to download it.
+   - **Actions artifacts** (temporary, ~90 days): click into the run → scroll to
+     **Artifacts** → download `Expense Tracker-debug-apk` or `Expense Tracker-release-apk` (each is a zip
+     containing the one APK).
 5. Transfer that `.apk` to your phone and open it there. Android will ask to allow
    "install unknown apps" for whichever app you used to open it — allow that once, then
    tap install.
 
 You can re-trigger a build any time from the Actions tab via "Run workflow", without
-needing a new push.
+needing a new push. Every run creates its own release/tag (`build-<run number>`), so old
+builds stay available — delete old releases from the Releases page if you want to tidy up.
 
 ## Alternative: build locally in Android Studio
 

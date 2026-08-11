@@ -7,6 +7,35 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:132675546899:android:de95d4c4b50e498a4db4e6",
+        "android_client_info": {
+          "package_name": "com.sushem.expenseTracker"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "132675546899-f0hinkpckom8an0l0r56d8o1a1oupj9b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC1riS6_Q-SdYw0qpdciSbHIPWRoYuVXQQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "132675546899-f0hinkpckom8an0l0r56d8o1a1oupj9b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:132675546899:android:ef6041b4ba1a668d4db4e6",
         "android_client_info": {
           "package_name": "com.sushem.ledger"

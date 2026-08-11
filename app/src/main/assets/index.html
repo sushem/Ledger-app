@@ -21,7 +21,20 @@
     display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:16px;}
   .month-nav{display:flex; align-items:center; gap:10px; margin-top:6px;}
   .month-nav button{background:var(--panel); border:1px solid var(--rule); border-radius:8px; width:28px; height:28px;
-    color:var(--faint); font-size:15px; line-height:1;}
+    color:var(--faint); font-size:15px; line-height:1; flex-shrink:0;}
+  .month-label{width:132px; flex-shrink:0; cursor:pointer; text-align:center; border-radius:8px; padding:2px 4px;}
+  .month-label:active{background:var(--panel2);}
+  .month-label .yr{font-size:10.5px; letter-spacing:.1em; color:var(--faint); margin-bottom:1px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .month-label .mo{font-size:20px; font-weight:600; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .picker-year-row{display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:16px;}
+  .picker-month-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .picker-month-btn{padding:14px 0; border-radius:10px; border:1px solid var(--rule); background:var(--panel2);
+    color:var(--paper); font-weight:600; font-size:13.5px; position:relative;}
+  .picker-month-btn.selected{border-color:var(--gold); background:var(--gold); color:var(--ink);}
+  .picker-dot{position:absolute; top:6px; right:8px; width:5px; height:5px; border-radius:50%; background:var(--gold);}
+  .picker-month-btn.selected .picker-dot{background:var(--ink);}
   .card{background:var(--panel); border:1px solid var(--rule); border-radius:16px; padding:20px;}
   .hero{margin:10px 20px 0;}
   .hero-top{display:flex; justify-content:space-between; align-items:flex-end; gap:14px; flex-wrap:wrap;}
@@ -205,6 +218,8 @@ function uid(){ return Math.random().toString(36).slice(2,10); }
 function fmt(n){ n = Number(n)||0; const sign = n<0 ? "-" : ""; return sign + "\u20B9" + Math.abs(n).toLocaleString("en-IN",{maximumFractionDigits:0}); }
 function esc(s){ const d=document.createElement("div"); d.innerText=s==null?"":s; return d.innerHTML; }
 function monthTitle(key){ const [y,m]=key.split("-").map(Number); return new Date(y, m-1, 1).toLocaleDateString("en-IN",{month:"long",year:"numeric"}); }
+function monthNamePart(key){ const [y,m]=key.split("-").map(Number); return new Date(y, m-1, 1).toLocaleDateString("en-IN",{month:"long"}); }
+function yearPart(key){ return key.split("-")[0]; }
 function shiftMonth(key, delta){ const [y,m]=key.split("-").map(Number); const d=new Date(y, m-1+delta, 1); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); }
 function monthTx(key){ return data.months[key] || []; }
 
@@ -263,9 +278,12 @@ function render(){
         <div>
           <div class="eyebrow mono">MONTHLY LEDGER</div>
           <div class="month-nav">
-            <button onclick="navMonth(-1)" style="flex:0 0 32px;>&#8249;</button>
-            <divclass="display"style="font-size:22px;font-weight:600;flex:1;min-width:0;max-width:150px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(monthTitle(viewMonth))}</div>
-            <button onclick="navMonth(1)" style="flex:0 0 32px;">&#8250;</button>
+            <button onclick="navMonth(-1)">&#8249;</button>
+            <div class="month-label" onclick="openMonthPicker()">
+              <div class="yr mono">${esc(yearPart(viewMonth))}</div>
+              <div class="mo display">${esc(monthNamePart(viewMonth))}</div>
+            </div>
+            <button onclick="navMonth(1)">&#8250;</button>
           </div>
         </div>
       </div>
@@ -342,6 +360,47 @@ function render(){
 }
 
 function navMonth(delta){ viewMonth = shiftMonth(viewMonth, delta); render(); }
+
+/* ---------------- month/year picker ---------------- */
+let pickerYear = null;
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function openMonthPicker(){
+  currentSheet = "monthPicker";
+  pickerYear = parseInt(viewMonth.split("-")[0], 10);
+  renderMonthPicker();
+}
+function renderMonthPicker(){
+  const gridHtml = MONTH_ABBR.map((label, i)=>{
+    const key = `${pickerYear}-${String(i+1).padStart(2,"0")}`;
+    const isSelected = key === viewMonth;
+    const hasData = !!(data.months[key] && data.months[key].length);
+    return `<button class="picker-month-btn${isSelected?" selected":""}" onclick="pickMonth(${i})">
+      ${label}${hasData ? `<span class="picker-dot"></span>` : ""}
+    </button>`;
+  }).join("");
+
+  renderOverlay(`
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="sheet-title display">Jump to month</div>
+        <button class="close-btn" onclick="closeOverlay()">&times;</button>
+      </div>
+      <div class="picker-year-row">
+        <button class="icon-btn" onclick="shiftPickerYear(-1)">&#8249;</button>
+        <div class="display" style="font-size:19px; font-weight:600; min-width:70px; text-align:center;">${pickerYear}</div>
+        <button class="icon-btn" onclick="shiftPickerYear(1)">&#8250;</button>
+      </div>
+      <div class="picker-month-grid">${gridHtml}</div>
+    </div>
+  `);
+}
+function shiftPickerYear(delta){ pickerYear += delta; renderMonthPicker(); }
+function pickMonth(monthIdx0){
+  viewMonth = `${pickerYear}-${String(monthIdx0+1).padStart(2,"0")}`;
+  closeOverlay();
+  render();
+}
+
 function setCatFilter(f){ catFilter = f; render(); }
 function removeTx(id){
   data.months[viewMonth] = (data.months[viewMonth]||[]).filter(t=>t.id!==id);

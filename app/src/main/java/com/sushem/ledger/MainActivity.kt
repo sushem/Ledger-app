@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         // ---------- Firestore sync ----------
         // Two separate collections, related only by uid:
         //   users/{uid}       -> profile (uid, displayName, email, updatedAt)
-        //   expenseTrackerData/{uid}  -> budget data (uid, expenseTrackerData json, updatedAt)
+        //   ledgerData/{uid}  -> budget data (uid, ledgerData json, updatedAt)
         @JavascriptInterface
         fun syncToCloud(json: String) {
             val user = firebaseAuth.currentUser
@@ -244,10 +244,10 @@ class MainActivity : AppCompatActivity() {
             }
             val payload = hashMapOf(
                 "uid" to user.uid,
-                "expenseTrackerData" to json,
+                "ledgerData" to json,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            firestore.collection("expenseTrackerData").document(user.uid)
+            firestore.collection("ledgerData").document(user.uid)
                 .set(payload, SetOptions.merge())
                 .addOnSuccessListener {
                     webView.post { webView.evaluateJavascript("onSyncComplete()", null) }
@@ -265,9 +265,9 @@ class MainActivity : AppCompatActivity() {
                 webView.post { webView.evaluateJavascript("onCloudDataLoaded(null)", null) }
                 return
             }
-            firestore.collection("expenseTrackerData").document(user.uid).get()
+            firestore.collection("ledgerData").document(user.uid).get()
                 .addOnSuccessListener { doc ->
-                    val json = doc.getString("expenseTrackerData")
+                    val json = doc.getString("ledgerData")
                     val js = if (json != null) "onCloudDataLoaded(${JSONObject.quote(json)})" else "onCloudDataLoaded(null)"
                     webView.post { webView.evaluateJavascript(js, null) }
                 }

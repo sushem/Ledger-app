@@ -32,8 +32,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ExpenseTracker-debug-apk
-          path: app/build/outputs/apk/debug/ExpenseTracker-debug.apk
-          if-no-files-found: warn
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
       - name: Build release APK
         run: gradle assembleRelease
@@ -43,8 +43,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ExpenseTracker-apk
-          path: app/build/outputs/apk/release/ExpenseTracker.apk
-          if-no-files-found: warn
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
 
   release:
     needs: build
@@ -63,6 +63,19 @@ jobs:
         with:
           name: ExpenseTracker-apk
           path: apks
+      
+      - name: Rename APK
+        run: |
+            mv apks/app-release.apk apks/ExpenseTracker.apk 
+            mv apks/app-debug.apk apks/ExpenseTracker-debug.apk
+
+      - name: Verify release files
+        run: |
+          echo "Debug APK:"
+          ls -lh apks/ExpenseTracker-debug.apk
+
+          echo "Release APK:"
+          ls -lh apks/ExpenseTracker.apk
 
       - name: Create GitHub Release with APKs attached
         uses: softprops/action-gh-release@v3

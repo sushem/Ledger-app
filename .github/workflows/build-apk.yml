@@ -72,9 +72,9 @@ jobs:
           body: |
             Automated build from commit ${{ github.sha }}.
             - `app-debug.apk` — debuggable, for testing
-            - `app-release.apk` — release build type (still signed with the shared debug.keystore, see README)
+            - `app-release.apk` — release build type
           files: |
-            apks/app-debug.apk
-            apks/app-release.apk
+            apks/Expense Tracker-debug.apk
+            apks/ExpenseTracker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

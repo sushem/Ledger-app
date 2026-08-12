@@ -31,8 +31,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ledger-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ExpenseTracker-debug-apk
+          path: app/build/outputs/apk/debug/ExpenseTracker-debug.apk
           if-no-files-found: warn
 
       - name: Build release APK
@@ -42,8 +42,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ledger-release-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          name: ExpenseTracker-apk
+          path: app/build/outputs/apk/release/ExpenseTracker.apk
           if-no-files-found: warn
 
   release:
@@ -55,13 +55,13 @@ jobs:
       - name: Download debug APK
         uses: actions/download-artifact@v7
         with:
-          name: ledger-debug-apk
+          name: ExpenseTracker-debug-apk
           path: apks
 
       - name: Download release APK
         uses: actions/download-artifact@v7
         with:
-          name: ledger-release-apk
+          name: ExpenseTracker-apk
           path: apks
 
       - name: Create GitHub Release with APKs attached
@@ -71,10 +71,10 @@ jobs:
           name: Build ${{ github.run_number }}
           body: |
             Automated build from commit ${{ github.sha }}.
-            - `app-debug.apk` — debuggable, for testing
-            - `app-release.apk` — release build type (still signed with the shared debug.keystore, see README)
+            - `ExpenseTracker-debug.apk` — debuggable, for testing
+            - `ExpenseTracker.apk` — release build type
           files: |
-            apks/app-debug.apk
-            apks/app-release.apk
+            apks/ExpenseTracker-debug.apk
+            apks/ExpenseTracker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

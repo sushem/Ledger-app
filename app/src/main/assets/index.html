@@ -114,6 +114,13 @@
   .settings-section{margin-top:22px; padding-top:18px; border-top:1px solid var(--rule);}
   .settings-section:first-child{margin-top:0; padding-top:0; border-top:none;}
   .settings-section-title{font-size:15px; margin-bottom:12px;}
+  .toggle-row{display:flex; align-items:center; justify-content:space-between; margin-top:14px; font-size:13.5px;}
+  .switch{position:relative; display:inline-block; width:42px; height:24px; flex-shrink:0;}
+  .switch input{position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer;}
+  .switch-track{position:absolute; inset:0; background:var(--panel2); border:1px solid var(--rule); border-radius:12px; transition:background .15s;}
+  .switch-thumb{position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--faint); transition:transform .15s, background .15s;}
+  .switch input:checked ~ .switch-track{background:var(--gold);}
+  .switch input:checked ~ .switch-track .switch-thumb{transform:translateX(18px); background:var(--ink);}
   /* theme editor */
   .theme-tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap;}
   .theme-tab{display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid var(--rule);
@@ -159,7 +166,9 @@ const DEFAULT_SETTINGS = {
   },
   planned: { Food:2000, Gifts:0, "Health/medical":0, Home:15000, Transportation:500,
     Utilities:500, Investments:2000, Other:1000, Paycheck:23000, Bonus:0, Interest:0, Savings:0 },
-  theme: { ...DEFAULT_THEME }
+  theme: { ...DEFAULT_THEME },
+  chartType: "doughnut", // "line" | "doughnut" | "pie"
+  showLegend: true
 };
 
 function isoDaysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10); }
@@ -198,6 +207,8 @@ function loadData(){
     if(rawStr){
       const migrated = migrateIfNeeded(JSON.parse(rawStr));
       if(migrated.settings && !migrated.settings.theme) migrated.settings.theme = { ...DEFAULT_THEME };
+      if(migrated.settings && !migrated.settings.chartType) migrated.settings.chartType = DEFAULT_SETTINGS.chartType;
+      if(migrated.settings && migrated.settings.showLegend === undefined) migrated.settings.showLegend = DEFAULT_SETTINGS.showLegend;
       return migrated;
     }
   }catch(e){}
@@ -263,10 +274,79 @@ function sparklineSVG(points, w, h, color){
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
+/* ---------------- Income & Expense Distribution chart ---------------- */
+function categoryColor(i, total){
+  // rotate around the theme's accent hue so the palette stays cohesive with
+  // whatever the user picked in the color-wheel theme editor
+  const base = hexToHsl(data.settings.theme.accent);
+  const hue = (base.h + i * (360 / Math.max(total, 1))) % 360;
+  return hslToHex(hue, 58, 52);
+}
+function computeChartRows(){
+  // same underlying data as the "By category" breakdown, but only entries with
+  // an actual amount (zero-value slices are meaningless in a pie/doughnut/line)
+  const rows = computeByCategory().filter(r => r.actual > 0);
+  return rows.map((r, i) => ({ ...r, color: categoryColor(i, rows.length) }));
+}
+function donutPieSVG(rows, size, isPie){
+  const total = rows.reduce((s,r)=>s+r.actual,0);
+  if(total <= 0) return `<div class="empty" style="padding:34px 0;">No ${catFilter} entries yet this month</div>`;
+  const r = size/2 - 6;
+  const cx = size/2, cy = size/2;
+  const circumference = 2*Math.PI*r;
+  const strokeWidth = isPie ? r : r*0.42;
+  let offset = 0;
+  const segs = rows.map(row=>{
+    const frac = row.actual/total;
+    const dash = frac*circumference;
+    const seg = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${row.color}" stroke-width="${strokeWidth}"
+      stroke-dasharray="${dash.toFixed(2)} ${(circumference-dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
+      transform="rotate(-90 ${cx} ${cy})" />`;
+    offset += dash;
+    return seg;
+  }).join("");
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs}</svg>`;
+}
+function lineChartSVG(rows, w, h){
+  const total = rows.reduce((s,r)=>s+r.actual,0);
+  if(total <= 0) return `<div class="empty" style="padding:34px 0;">No ${catFilter} entries yet this month</div>`;
+  const pad = 8;
+  const max = Math.max(...rows.map(r=>r.actual), 1);
+  const n = rows.length;
+  const stepX = n>1 ? (w - pad*2)/(n-1) : 0;
+  const pts = rows.map((r,i)=>[ pad + (n>1 ? i*stepX : (w-pad*2)/2), (h-pad) - (r.actual/max)*(h-pad*2) ]);
+  const poly = pts.map(p=>`${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const dots = pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.5" fill="${rows[i].color}" stroke="var(--panel)" stroke-width="1.5"/>`).join("");
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline points="${poly}" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>
+    ${dots}
+  </svg>`;
+}
+function renderDistributionChart(rows){
+  const type = data.settings.chartType || "doughnut";
+  if(type === "line") return lineChartSVG(rows, 280, 170);
+  return donutPieSVG(rows, 190, type === "pie");
+}
+function renderChartLegend(rows){
+  if(!data.settings.showLegend || rows.length===0) return "";
+  const total = rows.reduce((s,r)=>s+r.actual,0);
+  return `<div style="display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:16px; justify-content:center;">
+    ${rows.map(r=>{
+      const pct = total>0 ? Math.round((r.actual/total)*100) : 0;
+      return `<div style="display:flex; align-items:center; gap:6px; font-size:11.5px;">
+        <span style="width:9px; height:9px; border-radius:50%; background:${r.color}; flex-shrink:0;"></span>
+        <span style="color:var(--paper);">${esc(r.category)}</span>
+        <span class="mono" style="color:var(--faint);">${fmt(r.actual)} &middot; ${pct}%</span>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
 /* ---------------- rendering ---------------- */
 function render(){
   const stats = computeStats();
   const byCat = computeByCategory();
+  const chartRows = computeChartRows();
   const trend = computeTrend();
   const recent = [...monthTx(viewMonth)].sort((a,b)=>new Date(b.date)-new Date(a.date));
   const accentVar = "var(--gold)";
@@ -312,11 +392,21 @@ function render(){
 
     <section>
       <div class="section-head">
-        <div class="section-title display">By category</div>
+        <div class="section-title display">Income &amp; Expense Distribution</div>
         <div class="toggle">
           <button class="${catFilter==='expense'?'active':''}" onclick="setCatFilter('expense')">Expense</button>
           <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')">Income</button>
         </div>
+      </div>
+      <div class="card" style="display:flex; flex-direction:column; align-items:center; padding:20px 18px;">
+        ${renderDistributionChart(chartRows)}
+        ${renderChartLegend(chartRows)}
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div class="section-title display">By category</div>
       </div>
       <div class="card" style="padding:6px 18px;">
         ${byCat.length===0 ? `<div class="empty">No categories yet — add one in Settings.</div>` : byCat.map(row=>{
@@ -516,7 +606,7 @@ function renderSettingsSheet(){
           <button class="secondary-btn" id="restoreBtn" onclick="restoreFromCloud()">Restore from cloud</button>
           <button class="secondary-btn" onclick="nativeSignOut()">Sign out</button>
         ` : `
-          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your ledger to the cloud and use it across devices.</div>
+          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your Expense Tracker to the cloud and use it across devices.</div>
           <button class="primary-btn" style="margin-top:0;" onclick="nativeSignIn()">Sign in with Google</button>
         `}
       </div>
@@ -540,6 +630,25 @@ function renderSettingsSheet(){
           <button class="add-cat-btn" onclick="addCategory()">+</button>
         </div>
         <div class="err" id="catErr" style="display:none;"></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title display">Dashboard</div>
+        <div class="field"><label>Chart type</label>
+          <select id="chartTypeSelect" onchange="settingsDraft.chartType=this.value;">
+            <option value="doughnut" ${settingsDraft.chartType==="doughnut"?"selected":""}>Doughnut</option>
+            <option value="pie" ${settingsDraft.chartType==="pie"?"selected":""}>Pie</option>
+            <option value="line" ${settingsDraft.chartType==="line"?"selected":""}>Line</option>
+          </select>
+        </div>
+        <div class="toggle-row">
+          <span>Enable legends</span>
+          <label class="switch">
+            <input type="checkbox" id="showLegendToggle" ${settingsDraft.showLegend?"checked":""}
+              onchange="settingsDraft.showLegend=this.checked;" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
       </div>
 
       <div class="settings-section">

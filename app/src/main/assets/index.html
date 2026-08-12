@@ -516,7 +516,7 @@ function renderSettingsSheet(){
           <button class="secondary-btn" id="restoreBtn" onclick="restoreFromCloud()">Restore from cloud</button>
           <button class="secondary-btn" onclick="nativeSignOut()">Sign out</button>
         ` : `
-          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your Expense Tracker to the cloud and use it across devices.</div>
+          <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;">Sign in to back up your ledger to the cloud and use it across devices.</div>
           <button class="primary-btn" style="margin-top:0;" onclick="nativeSignIn()">Sign in with Google</button>
         `}
       </div>
@@ -875,6 +875,7 @@ function restoreFromCloud(){
 function onAuthStateChanged(uid, name, email, photo){
   authUser = uid ? { uid, name, email, photo } : null;
   if(currentSheet === "settings") renderSettingsSheet();
+  maybeShowSignInPrompt();
 }
 function onSyncComplete(){ clearBtnLoading("syncBtn"); showToast("Synced to cloud"); }
 function onSyncError(msg){ clearBtnLoading("syncBtn"); showToast(msg || "Sync failed"); }
@@ -882,6 +883,42 @@ function onCloudDataLoaded(jsonStrOrNull){
   clearBtnLoading("restoreBtn");
   if(!jsonStrOrNull){ showToast("No cloud backup found yet"); return; }
   applyImportedJson(jsonStrOrNull);
+}
+
+/* ---------------- first-launch "sign in to save to cloud" prompt ---------------- */
+const SIGNIN_PROMPT_KEY = "ledgerSignInPromptShown";
+let signInPromptChecked = false;
+function maybeShowSignInPrompt(){
+  if(signInPromptChecked) return;
+  signInPromptChecked = true;
+  if(authUser) return; // already signed in, nothing to prompt for
+  let alreadyShown = null;
+  try{ alreadyShown = localStorage.getItem(SIGNIN_PROMPT_KEY); }catch(e){}
+  if(alreadyShown) return; // only ever show this once, on first launch
+  try{ localStorage.setItem(SIGNIN_PROMPT_KEY, "1"); }catch(e){}
+  setTimeout(showSignInPrompt, 400);
+}
+function showSignInPrompt(){
+  if(currentSheet) return; // don't interrupt if some other sheet is already open
+  currentSheet = "signInPrompt";
+  renderOverlay(`
+    <div class="sheet">
+      <div style="text-align:center; padding:6px 4px 4px;">
+        <img src="logo.png" alt="" style="width:56px; height:56px; border-radius:14px; margin-bottom:14px;" />
+        <div class="sheet-title display" style="margin-bottom:8px;">Save your ledger to the cloud</div>
+        <div style="font-size:13px; color:var(--faint); line-height:1.5; margin-bottom:20px;">
+          Login to save changes to cloud — sign in with Google to back up your income and
+          expenses, and pick up where you left off on another device.
+        </div>
+        <button class="primary-btn" style="margin-top:0;" onclick="signInFromPrompt()">Sign in with Google</button>
+        <button class="secondary-btn" onclick="closeOverlay()">Maybe later</button>
+      </div>
+    </div>
+  `);
+}
+function signInFromPrompt(){
+  closeOverlay();
+  nativeSignIn();
 }
 
 /* ---------------- backup: export / import ---------------- */
@@ -903,7 +940,7 @@ function exportBackup(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Expense Tracker-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `ExpenseTracker-backup-${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   }
@@ -961,6 +998,11 @@ function closeOverlay(){
 
 applyTheme(data.settings.theme);
 render();
+// If there's no native bridge (e.g. previewing outside the Android app), onAuthStateChanged
+// will never fire natively — fall back to checking after a short delay so first-launch
+// still gets the prompt. If the native bridge IS present, its callback wins the race and
+// this becomes a no-op (guarded by signInPromptChecked).
+setTimeout(maybeShowSignInPrompt, 1200);
 </script>
 </body>
 </html>

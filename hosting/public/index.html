@@ -57,8 +57,8 @@
   .chevron{width:16px; height:16px; flex-shrink:0; color:var(--faint); transition:transform .15s ease;}
   .chevron.collapsed{transform:rotate(-90deg);}
   .collapsible-body{overflow:hidden;}
-  .toggle{display:flex; background:var(--panel); border-radius:8px; border:1px solid var(--rule); overflow:hidden;}
-  .toggle button{padding:5px 12px; font-size:11.5px; letter-spacing:.04em; border:none; background:transparent;
+  .toggle{display:flex; background:var(--panel); border-radius:6px; border:1px solid var(--rule); overflow:hidden;}
+  .toggle button{padding:4px 4px; font-size:11.5px; letter-spacing:.04em; border:none; background:transparent;
     color:var(--faint); font-weight:600; text-transform:capitalize;}
   .toggle button.active{background:var(--gold); color:var(--ink);}
   .cat-row{padding:12px 18px; border-bottom:1px solid var(--rule);}
@@ -417,7 +417,7 @@ function render(){
         </div>
         <div class="toggle">
           <button class="${catFilter==='expense'?'active':''}" onclick="setCatFilter('expense')">Expense</button>
-          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')">Income</button>
+          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')" style="margin-right: 14px;}">Income</button>
         </div>
       </div>
       ${sectionCollapsed.distribution ? "" : `

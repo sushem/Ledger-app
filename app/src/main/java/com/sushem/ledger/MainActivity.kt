@@ -22,13 +22,52 @@ import com.google.firebase.firestore.SetOptions
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        // Bump this only when you rebuild the APK with a new bundled assets/index.html.
+        // It's the fallback baseline used whenever no cached hosted override exists yet,
+        // or the cached override turns out to be older than what's now bundled.
+        private const val BUNDLED_BUILD_NUMBER = 1
+
+        // Replace with your real Firebase Hosting URL after deploying /hosting — see
+        // README "Firebase Hosting setup". Left as a placeholder, checkForUpdate() just
+        // fails silently (no host to resolve), so this is safe to leave unconfigured.
+        private const val REMOTE_VERSION_URL = "https://ledgerapp-1f2ed.web.app/version.json"
+
+        private const val PREFS_NAME = "ledger_update_prefs"
+        private const val PREF_ACTIVE_BUILD = "active_build_number"
+    }
 
     private lateinit var webView: WebView
     private lateinit var firebaseAuth: FirebaseAuth
     private lateinit var firestore: FirebaseFirestore
     private lateinit var googleSignInClient: GoogleSignInClient
+
+    // Where a downloaded hosted build gets cached, so it still works fully offline
+    // afterwards. logo.png is copied in alongside it so the relative <img src="logo.png">
+    // reference in the swapped-in HTML keeps resolving (it's now a different local
+    // directory than /android_asset/, which is where the bundled copy lives).
+    private val overrideDir: File get() = File(filesDir, "webapp_override")
+    private val overrideIndexFile: File get() = File(overrideDir, "index.html")
+    private val overrideLogoFile: File get() = File(overrideDir, "logo.png")
+
+    // The build currently considered "active" — an override only counts if it's both
+    // present on disk AND newer than whatever's bundled in this APK, so shipping a new
+    // APK naturally supersedes an old cached override without needing to clear anything.
+    private fun activeBuildNumber(): Int {
+        val cached = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getInt(PREF_ACTIVE_BUILD, 0)
+        return if (cached > BUNDLED_BUILD_NUMBER && overrideIndexFile.exists()) cached else BUNDLED_BUILD_NUMBER
+    }
+
+    private fun initialLoadUrl(): String =
+        if (activeBuildNumber() > BUNDLED_BUILD_NUMBER && overrideIndexFile.exists()) {
+            "file://${overrideIndexFile.absolutePath}"
+        } else {
+            "file:///android_asset/index.html"
+        }
 
     // ---- Google Sign-In result handling ----
     private val googleSignInLauncher = registerForActivityResult(
@@ -275,6 +314,70 @@ class MainActivity : AppCompatActivity() {
                     webView.post { webView.evaluateJavascript("onCloudDataLoaded(null)", null) }
                 }
         }
+
+        // ---------- hosted-build update check (Firebase Hosting) ----------
+        @JavascriptInterface
+        fun getLocalBuildNumber(): Int = activeBuildNumber()
+
+        @JavascriptInterface
+        fun checkForUpdate() {
+            Thread {
+                try {
+                    val text = URL(REMOTE_VERSION_URL).readText()
+                    val json = JSONObject(text)
+                    val remoteBuild = json.optInt("buildNumber", -1)
+                    val htmlUrl = json.optString("htmlUrl", "")
+                    if (remoteBuild > 0 && htmlUrl.startsWith("https://")) {
+                        val js = "onUpdateCheckResult($remoteBuild, ${JSONObject.quote(htmlUrl)})"
+                        webView.post { webView.evaluateJavascript(js, null) }
+                    }
+                } catch (e: Exception) {
+                    // Silent by design: this runs automatically on every launch, including
+                    // fully offline or before REMOTE_VERSION_URL is configured — no reason
+                    // to nag the user with an error toast for either of those.
+                }
+            }.start()
+        }
+
+        @JavascriptInterface
+        fun downloadUpdate(htmlUrl: String) {
+            Thread {
+                try {
+                    if (!htmlUrl.startsWith("https://")) throw IllegalArgumentException("Update URL must be HTTPS")
+                    val html = URL(htmlUrl).readText()
+                    if (!html.contains("<html", ignoreCase = true) || html.length < 500) {
+                        throw IllegalStateException("Downloaded content doesn't look like a valid page")
+                    }
+
+                    overrideDir.mkdirs()
+                    overrideIndexFile.writeText(html)
+                    if (!overrideLogoFile.exists()) {
+                        assets.open("logo.png").use { input ->
+                            FileOutputStream(overrideLogoFile).use { output -> input.copyTo(output) }
+                        }
+                    }
+
+                    // Re-fetch version.json for the build number this HTML actually
+                    // corresponds to, rather than trusting stale state passed in from JS.
+                    val versionJson = JSONObject(URL(REMOTE_VERSION_URL).readText())
+                    val newBuild = versionJson.optInt("buildNumber", activeBuildNumber())
+
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                        .putInt(PREF_ACTIVE_BUILD, newBuild)
+                        .apply()
+
+                    runOnUiThread {
+                        webView.evaluateJavascript("onUpdateDownloaded($newBuild)", null)
+                        webView.postDelayed({
+                            webView.loadUrl("file://${overrideIndexFile.absolutePath}")
+                        }, 600)
+                    }
+                } catch (e: Exception) {
+                    val msg = JSONObject.quote("Update failed: ${e.message ?: "unknown error"}")
+                    webView.post { webView.evaluateJavascript("onUpdateError($msg)", null) }
+                }
+            }.start()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -311,7 +414,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(webView)
-        webView.loadUrl("file:///android_asset/index.html")
+        webView.loadUrl(initialLoadUrl())
     }
 
     override fun onBackPressed() {

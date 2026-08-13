@@ -14,6 +14,18 @@ optionally syncs to your own Firebase project once you sign in with Google.
 - No ads, no analytics, no third-party code beyond Firebase/Google Sign-In itself.
 
 ## What's new in this build
+- **Firebase Hosting hot-updates**: the app can now pick up HTML/CSS/JS-only changes
+  without a new APK — see "Firebase Hosting setup" below. A dot appears on the Settings
+  gear icon when a newer build is published; Settings → Updates (below Backup) shows
+  either a "Download latest build" button or a "You're on the latest build" message.
+- **Income & Expense Distribution chart**: new dashboard section above "By category"
+  with Line/Doughnut/Pie chart types (Settings → Dashboard) and an optional legend,
+  hand-drawn in SVG (no chart library, keeps the app dependency-free/offline-friendly).
+  Colors rotate around your current theme's accent hue so the palette stays cohesive
+  with whatever you've picked in the color-wheel theme editor.
+- **Collapsible dashboard sections**: tap the chevron next to "Income & Expense
+  Distribution" or "By category" to collapse/expand it — handy once you've got a few
+  months of data and want a shorter scroll.
 - **Debug and release build variants**: CI now builds and uploads both — see
   `Expense Tracker-debug-apk` and `Expense Tracker-release-apk` under each Actions run's Artifacts.
   Both are signed with the same committed `debug.keystore` (see the signing note further
@@ -40,7 +52,7 @@ optionally syncs to your own Firebase project once you sign in with Google.
 - Firestore uses two separate top-level collections, related only by `uid` (no nesting):
   - `users/{uid}` — profile: `uid`, `displayName`, `email`, `updatedAt`. Written once at
     sign-in.
-  - `Expense TrackerData/{uid}` — your budget data: `uid`, `Expense TrackerData` (the same JSON blob used
+  - `ledgerData/{uid}` — your budget data: `uid`, `ledgerData` (the same JSON blob used
     for local backups), `updatedAt`. Written whenever you tap "Sync to cloud".
   Each collection is keyed by the same Firebase Auth `uid`, so joining them back together
   (if you ever query them from outside the app) is a simple document-ID lookup, not a
@@ -48,6 +60,58 @@ optionally syncs to your own Firebase project once you sign in with Google.
 
 *(Multi-month tracking, backup export/import, and the color-wheel theme editor from
 earlier builds are all still here — see git history for their write-ups.)*
+
+---
+
+## Firebase Hosting setup (optional — hot-updates without an APK rebuild)
+
+This lets you tweak `index.html` (layout, copy, a new chart type, whatever) and have it
+show up in the installed app without publishing a new APK — genuinely useful for a
+personal app where re-signing/redistributing an APK for every small UI tweak is annoying.
+
+**How it works:** the app always ships with `app/src/main/assets/index.html` bundled in
+the APK as a fallback. On launch it also asks a `version.json` file on your Firebase
+Hosting site "what's the latest build number?" — if that's higher than what's currently
+active on the phone, Settings shows a "Download latest build" button. Tapping it downloads
+that HTML, caches it in the app's private storage (so it keeps working offline afterwards),
+and hot-swaps the WebView into it. No Play Store, no reinstall.
+
+**⚠️ Trust model, read this first:** downloaded HTML runs with the *same* privileged
+`Android` JS bridge as the bundled app — Firestore access, your signed-in Google account,
+file export/import. Anyone who could tamper with what's served at your Hosting URL could
+run arbitrary code with that access. This is a reasonable tradeoff for a personal project
+where you're the only one who controls the Firebase project, but it's a meaningfully
+different risk profile than a normal static APK — don't point `REMOTE_VERSION_URL` at
+anything you don't fully control, and always serve over HTTPS (Firebase Hosting does this
+by default; the app also refuses non-HTTPS URLs outright).
+
+Setup steps:
+
+1. Install the Firebase CLI if you don't have it: `npm install -g firebase-tools`, then
+   `firebase login`.
+2. From this project's `hosting/` folder: `firebase init hosting` → choose "Use an
+   existing project" → pick the same Firebase project from the setup above → set the
+   public directory to `public` (already the case here — just confirm) → "Configure as a
+   single-page app?" **No** → don't overwrite `hosting/public/index.html` if prompted.
+3. Deploy: `firebase deploy --only hosting`. The CLI prints your Hosting URL, something
+   like `https://your-project-id.web.app`.
+4. Update two files with that real URL (replacing the `YOUR-FIREBASE-PROJECT` placeholder):
+   - `app/src/main/java/com/sushem/ledger/MainActivity.kt` → `REMOTE_VERSION_URL` constant
+   - `hosting/public/version.json` → `htmlUrl` field
+   Redeploy hosting (`firebase deploy --only hosting` again) and do one normal APK
+   rebuild/release with the updated `MainActivity.kt` — this is the one time you do need
+   a fresh APK, to teach the app where to check.
+5. From then on, for HTML/CSS/JS-only changes: edit `hosting/public/index.html`, bump
+   `buildNumber` in `hosting/public/version.json`, `firebase deploy --only hosting`. Open
+   the app — the dot appears on the gear icon within a few seconds (it checks on every
+   launch), and Settings → Updates lets you pull it in.
+6. Keep `hosting/public/index.html` and `app/src/main/assets/index.html` in sync manually
+   — whenever you change one for a real release, copy it to the other so the bundled
+   fallback and the hosted version don't drift apart indefinitely. (The bundled copy is
+   what a *fresh install* sees before it's ever checked for an update.)
+
+If you never do this setup, nothing changes — `checkForUpdate()` fails silently against
+the placeholder URL and the app behaves exactly as before.
 
 ---
 
@@ -90,7 +154,7 @@ reads it at build time. None of this costs anything at this scale (Spark/free pl
        match /users/{userId} {
          allow read, write: if request.auth != null && request.auth.uid == userId;
        }
-       match /Expense TrackerData/{userId} {
+       match /ledgerData/{userId} {
          allow read, write: if request.auth != null && request.auth.uid == userId;
        }
      }
@@ -103,7 +167,7 @@ reads it at build time. None of this costs anything at this scale (Spark/free pl
 That's it — steps 1–5 only need to happen once. From here on, building the app (via
 GitHub Actions or Android Studio, see below) picks up `google-services.json` automatically.
 
-> Already did this setup before this update? The rules above changed (a new `Expense TrackerData`
+> Already did this setup before this update? The rules above changed (a new `ledgerData`
 > collection was added) — go back to Firestore → Rules and re-publish with the version
 > shown here, or "Sync to cloud" will fail with a permission error.
 
@@ -175,3 +239,8 @@ only if you're adding new native capabilities.
   convention) — fine for sideloading to your own devices, but if you ever publish this
   to the Play Store, generate a proper private release key instead and register its
   SHA-1 with Firebase too (Firebase supports multiple fingerprints per app).
+- If you set up Firebase Hosting hot-updates and ever want to force the app back to the
+  version bundled in the APK (e.g. a bad hosted build got downloaded), there's no reset
+  button in Settings yet. Clearing the app's storage or reinstalling both work, but
+  **either one also wipes your local budget data** (it lives in the same WebView storage
+  as the cached override) — export a backup or sync to cloud first if you go this route.

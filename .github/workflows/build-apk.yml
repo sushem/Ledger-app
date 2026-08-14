@@ -72,8 +72,10 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
+
     steps:
       - name: Download debug APK
         if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
@@ -88,31 +90,14 @@ jobs:
         with:
           name: ExpenseTracker-apk
           path: apks
-      
 
-      - name: Verify debug files
-        if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
+      - name: Verify downloaded files
         run: |
-          echo "Debug APK:"
-          ls -lh apks/ExpenseTracker-debug.apk
-      
-      - name: Verify release files
-        if: ${{ inputs.build_type == 'release' || inputs.build_type == 'both' }}
-        run: |
-          echo "Release APK:"
-          ls -lh apks/ExpenseTracker.apk
+          echo "Downloaded APKs:"
+          find apks -type f -name "*.apk" -ls
 
-      - name: Prepare release files
-        run: |
-          if [[ "${{ inputs.build_type }}" == "debug" ]]; then
-            echo "RELEASE_FILES=apks/ExpenseTracker-debug.apk" >> "$GITHUB_ENV"
-          elif [[ "${{ inputs.build_type }}" == "release" ]]; then
-            echo "RELEASE_FILES=apks/ExpenseTracker.apk" >> "$GITHUB_ENV"
-          else
-            echo "RELEASE_FILES=apks/ExpenseTracker-debug.apk apks/ExpenseTracker.apk" >> "$GITHUB_ENV"
-          fi
-
-      - name: Create GitHub Release
+      - name: Create GitHub Release - Debug
+        if: ${{ inputs.build_type == 'debug' }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: build-${{ github.run_number }}
@@ -120,12 +105,46 @@ jobs:
           body: |
             Automated build from commit ${{ github.sha }}.
 
-            Build type: `${{ inputs.build_type }}`
+            Build type: `debug`
 
-            ${{ inputs.build_type == 'debug' && '- `ExpenseTracker-debug.apk` — debuggable, for testing' || '' }}
-            ${{ inputs.build_type == 'release' && '- `ExpenseTracker.apk` — release build' || '' }}
-            ${{ inputs.build_type == 'both' && '- `ExpenseTracker-debug.apk` — debuggable, for testing
-            - `ExpenseTracker.apk` — release build' || '' }}
-          files: ${{ env.RELEASE_FILES }}
+            - `ExpenseTracker-debug.apk` — debuggable, for testing
+          files: |
+            apks/ExpenseTracker-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release - Release
+        if: ${{ inputs.build_type == 'release' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}.
+
+            Build type: `release`
+
+            - `ExpenseTracker.apk` — release build
+          files: |
+            apks/ExpenseTracker.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release - Both
+        if: ${{ inputs.build_type == 'both' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}.
+
+            Build type: `both`
+
+            - `ExpenseTracker-debug.apk` — debuggable, for testing
+            - `ExpenseTracker.apk` — release build
+          files: |
+            apks/ExpenseTracker-debug.apk
+            apks/ExpenseTracker.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

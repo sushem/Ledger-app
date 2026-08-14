@@ -1,11 +1,22 @@
 name: Build APK
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: "Select APK build type"
+        required: true
+        type: choice
+        options:
+          - debug
+          - release
+          - both
+        default: both
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -23,69 +34,37 @@ jobs:
           cache-disabled: true
 
       - name: Build debug APK
+        if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
         run: gradle assembleDebug
 
-      - name: Upload debug APK
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ExpenseTracker-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-
       - name: Build release APK
+        if: ${{ inputs.build_type == 'release' || inputs.build_type == 'both' }}
         run: gradle assembleRelease
 
+      - name: Rename debug APK
+        if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk \
+             app/build/outputs/apk/debug/ExpenseTracker-debug.apk
+
+      - name: Rename release APK
+        if: ${{ inputs.build_type == 'release' || inputs.build_type == 'both' }}
+        run: |
+          mv app/build/outputs/apk/release/app-release.apk \
+             app/build/outputs/apk/release/ExpenseTracker.apk
+
+      - name: Upload debug APK
+        if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ExpenseTracker-debug-apk
+          path: app/build/outputs/apk/debug/ExpenseTracker-debug.apk
+          if-no-files-found: error
+
       - name: Upload release APK
-        if: always()
+        if: ${{ inputs.build_type == 'release' || inputs.build_type == 'both' }}
         uses: actions/upload-artifact@v7
         with:
           name: ExpenseTracker-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: app/build/outputs/apk/release/ExpenseTracker.apk
           if-no-files-found: error
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download debug APK
-        uses: actions/download-artifact@v7
-        with:
-          name: ExpenseTracker-debug-apk
-          path: apks
-
-      - name: Download release APK
-        uses: actions/download-artifact@v7
-        with:
-          name: ExpenseTracker-apk
-          path: apks
-      
-      - name: Rename APK
-        run: |
-            mv apks/app-release.apk apks/ExpenseTracker.apk 
-            mv apks/app-debug.apk apks/ExpenseTracker-debug.apk
-
-      - name: Verify release files
-        run: |
-          echo "Debug APK:"
-          ls -lh apks/ExpenseTracker-debug.apk
-
-          echo "Release APK:"
-          ls -lh apks/ExpenseTracker.apk
-
-      - name: Create GitHub Release with APKs attached
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Build ${{ github.run_number }}
-          body: |
-            Automated build from commit ${{ github.sha }}.
-            - `ExpenseTracker-debug.apk` — debuggable, for testing
-            - `ExpenseTracker.apk` — release build type
-          files: |
-            apks/ExpenseTracker-debug.apk
-            apks/ExpenseTracker.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

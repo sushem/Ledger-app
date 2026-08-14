@@ -52,6 +52,22 @@ jobs:
         run: |
           mv app/build/outputs/apk/release/app-release.apk \
              app/build/outputs/apk/release/ExpenseTracker.apk
+      
+      - name: Upload debug APK
+        if: ${{ inputs.build_type == 'debug' || inputs.build_type == 'both' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ExpenseTracker-debug-apk
+          path: app/build/outputs/apk/debug/ExpenseTracker-debug.apk
+          if-no-files-found: error
+
+      - name: Upload release APK
+        if: ${{ inputs.build_type == 'release' || inputs.build_type == 'both' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ExpenseTracker-apk
+          path: app/build/outputs/apk/release/ExpenseTracker.apk
+          if-no-files-found: error
 
   release:
     needs: build

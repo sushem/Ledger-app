@@ -51,16 +51,16 @@
   .stat.expense .stat-label{color:var(--rust);}
   .stat-val{font-size:18px;}
   section{margin:20px 20px 0;}
-  .section-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+  .section-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;padding-right:8%}
   .section-title{font-size:17px;}
   .section-title-row{display:flex; align-items:center; gap:8px; cursor:pointer;}
   .chevron{width:16px; height:16px; flex-shrink:0; color:var(--faint); transition:transform .15s ease;}
   .chevron.collapsed{transform:rotate(-90deg);}
   .collapsible-body{overflow:hidden;}
-  .toggle{display:flex; background:var(--panel); border-radius:6px; border:1px solid var(--rule); overflow:hidden;}
+  .toggle{display:flex; background:var(--panel); border-radius:6px; border:1px solid var(--rule);}
   .toggle button{padding:4px 4px; font-size:11.5px; letter-spacing:.04em; border:none; background:transparent;
     color:var(--faint); font-weight:600; text-transform:capitalize;}
-  .toggle button.active{background:var(--gold); color:var(--ink);}
+  .toggle button.active{background:var(--gold); color:var(--ink); border-radius:6px; overflow:hidden;}
   .cat-row{padding:12px 18px; border-bottom:1px solid var(--rule);}
   .cat-row:last-child{border-bottom:none;}
   .cat-top{display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px;}
@@ -419,7 +419,7 @@ function render(){
         </div>
         <div class="toggle">
           <button class="${catFilter==='expense'?'active':''}" onclick="setCatFilter('expense')">Expense</button>
-          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')" style="margin-right: 14px;}">Income</button>
+          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')">Income</button>
         </div>
       </div>
       ${sectionCollapsed.distribution ? "" : `
@@ -722,12 +722,6 @@ function renderSettingsSheet(){
           </div>
         `}
       </div>` : ""}
-
-      //TO-DO revalidate post build
-      <div class="settings-section">
-        <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;"> You're on v1 localBuild.
-          </div>
-        </div>
         
       <button class="primary-btn" onclick="submitSettings()">Save settings</button>
     </div>

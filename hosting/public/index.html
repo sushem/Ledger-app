@@ -167,8 +167,11 @@ const DEFAULT_THEME = { ink: "#000000", accent: "#C9A227", income: "#7FB69A", ex
 const DEFAULT_SETTINGS = {
   initialBalance: 0,
   categories: {
+    expense: ["Food","Health/medical","Home","Transportation","Utilities","Investments","Other","Gifts"],
+    income: ["Salary","Bonus","Interest","Savings","Other"]
   },
   planned: { Food:2000, Gifts:0, "Health/medical":0, Home:15000, Transportation:500,
+        Utilities:500, Investments:2000, Other:1000, Salary:23000, Bonus:0, Interest:0, Savings:0 },
   theme: { ...DEFAULT_THEME },
   chartType: "doughnut", // "line" | "doughnut" | "pie"
   showLegend: true
@@ -377,9 +380,15 @@ function render(){
               <div class="yr mono">${esc(yearPart(viewMonth))}</div>
               <div class="mo display">${esc(monthNamePart(viewMonth))}</div>
             </div>
-            <button onclick="navMonth(1)">&#8250;</button>
+
+            <button onclick="navMonth(1)" style="flex-shrink:0;">&#8250;</button>
           </div>
-        </div>
+
+          <button class="icon-btn" id="settingsGearBtn" onclick="openSettings()" style="flex-shrink:0;">
+            &#9881;${updateInfo.available ? `<span class="update-dot" id="updateDot"></span>` : ""}
+          </button>
+        </header>
+        <hr style="width:95%; margin:4px auto 0; border:none; border-top:1px solid grey;">
       </div>
 
     <div class="hero card">

@@ -43,6 +43,12 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var firebaseAuth: FirebaseAuth
+    // True whenever a bottom sheet (Settings, Add entry, month picker, etc.) is open in
+    // the page. Updated by JS via WebAppInterface.notifyOverlayState() so the system back
+    // button/gesture can close the sheet first instead of exiting the app straight to the
+    // home screen — WebView's own canGoBack() knows nothing about it, since opening a
+    // sheet is a DOM change within one page, not a real page navigation.
+    @Volatile private var isOverlayOpen = false
     private lateinit var firestore: FirebaseFirestore
     private lateinit var googleSignInClient: GoogleSignInClient
 
@@ -146,6 +152,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class WebAppInterface {
+
+        // ---------- overlay/sheet state, for handling the system back button correctly ----------
+        @JavascriptInterface
+        fun notifyOverlayState(isOpen: Boolean) {
+            isOverlayOpen = isOpen
+        }
 
         // ---------- backup export/import ----------
         @JavascriptInterface
@@ -418,10 +430,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
+        when {
+            isOverlayOpen -> webView.evaluateJavascript("closeOverlay()", null)
+            webView.canGoBack() -> webView.goBack()
+            else -> super.onBackPressed()
         }
     }
 }

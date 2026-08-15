@@ -1076,6 +1076,7 @@ function onUpdateCheckResult(remoteBuildNumber, htmlUrl){
   };
   updateGearDot();
   if(currentSheet === "settings") renderSettingsSheet();
+  maybeShowUpdatePopup();
 }
 function downloadUpdate(){
   if(!(window.Android && window.Android.downloadUpdate && updateInfo.htmlUrl)) return;
@@ -1090,6 +1091,109 @@ function onUpdateDownloaded(newBuildNumber){
 function onUpdateError(msg){
   clearBtnLoading("downloadUpdateBtn");
   showToast(msg || "Update check failed");
+}
+
+/* ---------------- reusable popup ----------------
+   A generic modal popup built on the same bottom-sheet overlay as everything else in the
+   app (renderOverlay/closeOverlay), so it inherits back-button handling, dimmed backdrop,
+   and styling for free. Supports any number of horizontally-laid-out action buttons plus
+   an optional corner close (×) button — pass real functions for callbacks, not strings.
+
+   showPopup({
+     title: "...",              required
+     message: "...",            optional, raw HTML (caller escapes any dynamic text)
+     closable: true,            optional, default true — shows the corner × button
+     onClose: () => {...},      optional, called when the × is tapped (in addition to closing)
+     buttons: [                 optional, 0+ buttons rendered in a single horizontal row
+       { label: "...", style: "primary" | "secondary", onClick: () => {...} }
+     ]
+   })
+*/
+function showPopup(opts){
+  const {
+    title = "",
+    message = "",
+    closable = true,
+    onClose = null,
+    buttons = []
+  } = opts;
+
+  currentSheet = "popup";
+  const buttonsHtml = buttons.map((b, i) => {
+    const cls = b.style === "secondary" ? "secondary-btn" : "primary-btn";
+    return `<button class="${cls}" style="flex:1; width:auto; margin-top:0;" data-popup-btn="${i}">${esc(b.label)}</button>`;
+  }).join("");
+
+  renderOverlay(`
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="sheet-title display">${title}</div>
+        ${closable ? `<button class="close-btn" id="popupCloseBtn">&times;</button>` : ""}
+      </div>
+      ${message ? `<div style="font-size:13px; color:var(--faint); line-height:1.5; margin-bottom:18px;">${message}</div>` : ""}
+      ${buttons.length ? `<div style="display:flex; gap:10px;">${buttonsHtml}</div>` : ""}
+    </div>
+  `);
+
+  if(closable){
+    const closeBtn = document.getElementById("popupCloseBtn");
+    if(closeBtn) closeBtn.onclick = () => { closeOverlay(); if(onClose) onClose(); };
+  }
+  buttons.forEach((b, i) => {
+    const btn = document.querySelector(`[data-popup-btn="${i}"]`);
+    if(btn) btn.onclick = () => { if(b.onClick) b.onClick(); };
+  });
+}
+
+/* Yes/No style confirm popup — thin wrapper over showPopup() capped at exactly 2 buttons,
+   for future use anywhere a "are you sure?" style prompt is needed. */
+function showConfirmPopup(opts){
+  const {
+    title = "",
+    message = "",
+    confirmLabel = "Yes",
+    cancelLabel = "No",
+    onConfirm = null,
+    onCancel = null,
+    closable = true
+  } = opts;
+
+  showPopup({
+    title,
+    message,
+    closable,
+    onClose: onCancel,
+    buttons: [
+      { label: cancelLabel, style: "secondary", onClick: () => { closeOverlay(); if(onCancel) onCancel(); } },
+      { label: confirmLabel, style: "primary", onClick: () => { closeOverlay(); if(onConfirm) onConfirm(); } }
+    ]
+  });
+}
+
+/* ---------------- update-available popup ----------------
+   Shown automatically once a newer hosted build is detected, alongside (not instead of)
+   the existing Settings gear dot + Updates section, which always stays available/accurate.
+   Dismissing via the × doesn't ask again for that same build — only resurfaces once a
+   newer build than the one already dismissed shows up. */
+const UPDATE_POPUP_DISMISS_KEY = "expenseTrackerUpdatePopupDismissedBuild";
+function maybeShowUpdatePopup(){
+  if(!updateInfo.available) return;
+  let dismissedBuild = null;
+  try{ dismissedBuild = localStorage.getItem(UPDATE_POPUP_DISMISS_KEY); }catch(e){}
+  if(dismissedBuild && parseInt(dismissedBuild, 10) >= updateInfo.remoteBuildNumber) return;
+  if(currentSheet) return; // don't interrupt a sheet the user already has open
+
+  showPopup({
+    title: "Update available",
+    message: `A newer build (v${updateInfo.remoteBuildNumber}) is ready &mdash; you're on v${updateInfo.localBuildNumber}.`,
+    closable: true,
+    onClose: () => {
+      try{ localStorage.setItem(UPDATE_POPUP_DISMISS_KEY, String(updateInfo.remoteBuildNumber)); }catch(e){}
+    },
+    buttons: [
+      { label: "Update now", style: "primary", onClick: () => { closeOverlay(); downloadUpdate(); } }
+    ]
+  });
 }
 
 /* ---------------- first-launch "sign in to save to cloud" prompt ---------------- */
@@ -1195,12 +1299,14 @@ function renderOverlay(html){
   ov.innerHTML = html;
   ov.onclick = (e)=>{ if(e.target===ov) closeOverlay(); };
   requestAnimationFrame(()=>ov.classList.add("show"));
+  if(window.Android && window.Android.notifyOverlayState) window.Android.notifyOverlayState(true);
 }
 function closeOverlay(){
   currentSheet = null;
   const ov = document.getElementById("overlay");
   ov.classList.remove("show");
   setTimeout(()=>{ ov.innerHTML=""; }, 180);
+  if(window.Android && window.Android.notifyOverlayState) window.Android.notifyOverlayState(false);
 }
 
 applyTheme(data.settings.theme);

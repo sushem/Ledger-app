@@ -57,8 +57,6 @@
   .chevron{width:16px; height:16px; flex-shrink:0; color:var(--faint); transition:transform .15s ease;}
   .chevron.collapsed{transform:rotate(-90deg);}
   .collapsible-body{overflow:hidden;}
-  .toggle{display:flex; background:var(--panel); border-radius:6px; border:1px solid var(--rule); overflow:hidden;}
-  .toggle button{padding:4px 4px; font-size:11.5px; letter-spacing:.04em; border:none; background:transparent;
     color:var(--faint); font-weight:600; text-transform:capitalize;}
   .toggle button.active{background:var(--gold); color:var(--ink);}
   .cat-row{padding:12px 18px; border-bottom:1px solid var(--rule);}
@@ -167,11 +165,8 @@ const DEFAULT_THEME = { ink: "#000000", accent: "#C9A227", income: "#7FB69A", ex
 const DEFAULT_SETTINGS = {
   initialBalance: 0,
   categories: {
-    expense: ["Food","Health/medical","Home","Transportation","Utilities","Investments","Other","Gifts"],
-    income: ["Salary","Bonus","Interest","Savings","Other"]
   },
   planned: { Food:2000, Gifts:0, "Health/medical":0, Home:15000, Transportation:500,
-    Utilities:500, Investments:2000, Other:1000, Salary:23000, Bonus:0, Interest:0, Savings:0 },
   theme: { ...DEFAULT_THEME },
   chartType: "doughnut", // "line" | "doughnut" | "pie"
   showLegend: true
@@ -380,15 +375,9 @@ function render(){
               <div class="yr mono">${esc(yearPart(viewMonth))}</div>
               <div class="mo display">${esc(monthNamePart(viewMonth))}</div>
             </div>
-
-            <button onclick="navMonth(1)" style="flex-shrink:0;">&#8250;</button>
+            <button onclick="navMonth(1)">&#8250;</button>
           </div>
-
-          <button class="icon-btn" id="settingsGearBtn" onclick="openSettings()" style="flex-shrink:0;">
-            &#9881;${updateInfo.available ? `<span class="update-dot" id="updateDot"></span>` : ""}
-          </button>
-        </header>
-        <hr style="width:95%; margin:4px auto 0; border:none; border-top:1px solid grey;">
+        </div>
       </div>
 
     <div class="hero card">
@@ -419,7 +408,7 @@ function render(){
         </div>
         <div class="toggle">
           <button class="${catFilter==='expense'?'active':''}" onclick="setCatFilter('expense')">Expense</button>
-          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')" style="margin-right: 14px;}">Income</button>
+          <button class="${catFilter==='income'?'active':''}" onclick="setCatFilter('income')">Income</button>
         </div>
       </div>
       ${sectionCollapsed.distribution ? "" : `
@@ -723,7 +712,6 @@ function renderSettingsSheet(){
         `}
       </div>` : ""}
 
-      //TO-DO revalidate post build
       <div class="settings-section">
         <div style="font-size:12.5px; color:var(--faint); margin-bottom:10px;"> You're on v1 localBuild.
           </div>
@@ -1013,9 +1001,12 @@ function clearBtnLoading(id){
   btn.disabled = false;
   btn.textContent = btn.dataset.originalText !== undefined ? btn.dataset.originalText : btn.textContent;
 }
+let signInInProgress = false;
 function nativeSignIn(){
-  if(window.Android && window.Android.signIn) window.Android.signIn();
-  else showToast("Google Sign-In is only available in the Android app");
+  if(window.Android && window.Android.signIn){
+    signInInProgress = true;
+    window.Android.signIn();
+  } else showToast("Google Sign-In is only available in the Android app");
 }
 function nativeSignOut(){
   if(window.Android && window.Android.signOut) window.Android.signOut();
@@ -1035,9 +1026,26 @@ function restoreFromCloud(){
 }
 // called by the native Android bridge whenever sign-in state changes
 function onAuthStateChanged(uid, name, email, photo){
+  const wasSignedIn = !!authUser;
   authUser = uid ? { uid, name, email, photo } : null;
   if(currentSheet === "settings") renderSettingsSheet();
   maybeShowSignInPrompt();
+
+  // Only auto-restore right after the user actively tapped "Sign in with Google" and it
+  // just succeeded (signed-out -> signed-in). This deliberately does NOT fire on every
+  // app launch where a previous session auto-restores — doing that would silently
+  // overwrite any local-only changes made since the last sync, which goes against how
+  // sync/restore is designed everywhere else in this app (manual and explicit).
+  if(signInInProgress){
+    signInInProgress = false;
+    if(authUser && !wasSignedIn) autoRestoreAfterSignIn();
+  }
+}
+function autoRestoreAfterSignIn(){
+  if(!(window.Android && window.Android.loadFromCloud)) return;
+  setBtnLoading("restoreBtn", "Restoring…"); // no-op if Settings isn't open, harmless
+  showToast("Signed in — checking for a cloud backup…");
+  window.Android.loadFromCloud();
 }
 function onSyncComplete(){ clearBtnLoading("syncBtn"); showToast("Synced to cloud"); }
 function onSyncError(msg){ clearBtnLoading("syncBtn"); showToast(msg || "Sync failed"); }
